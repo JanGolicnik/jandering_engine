@@ -5,3 +5,5 @@ pub mod renderer;
 pub mod pipeline;
 
 pub mod object;
+
+pub mod camera;

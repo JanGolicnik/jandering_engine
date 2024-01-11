@@ -19,11 +19,11 @@ pub struct Object {
     //
     // pub instances: Vec<Instance>,
     //
-    // pub scale: glm::Vec3,
-    // //
-    // pub position: glm::Vec3,
-    // //
-    // pub rotation: glm::Vec3,
+    pub scale: cgmath::Vector3<f32>,
+    //
+    pub position: cgmath::Vector3<f32>,
+    //
+    pub rotation: cgmath::Vector3<f32>,
     //
     pub pipeline: Option<Pipeline>,
 }

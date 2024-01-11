@@ -1,6 +1,9 @@
 use winit::window::Window;
 
-use crate::object::{Object, Vertex};
+use crate::{
+    camera::Camera,
+    object::{Object, Vertex},
+};
 
 use super::Renderer;
 
@@ -61,67 +64,78 @@ impl Renderer {
 
         surface.configure(&device, &config);
 
-        let default_shader = {
-            let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Default Shader Layout"),
-                bind_group_layouts: &[],
-                push_constant_ranges: &[],
-            });
-            let shader = wgpu::ShaderModuleDescriptor {
-                label: Some("Default Shader"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("default_shader.wgsl").into()),
-            };
-            let shader = device.create_shader_module(shader);
-            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("Render Pipeline"),
-                layout: Some(&layout),
-                vertex: wgpu::VertexState {
-                    module: &shader,
-                    entry_point: "vs_main",
-                    buffers: &[Vertex::desc()],
-                },
-                fragment: Some(wgpu::FragmentState {
-                    module: &shader,
-                    entry_point: "fs_main",
-                    targets: &[Some(wgpu::ColorTargetState {
-                        format: config.format,
-                        blend: Some(wgpu::BlendState {
-                            alpha: wgpu::BlendComponent::REPLACE,
-                            color: wgpu::BlendComponent::REPLACE,
-                        }),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    })],
-                }),
-                primitive: wgpu::PrimitiveState {
-                    topology: wgpu::PrimitiveTopology::TriangleList,
-                    strip_index_format: None,
-                    front_face: wgpu::FrontFace::Ccw,
-                    cull_mode: Some(wgpu::Face::Back),
-                    polygon_mode: wgpu::PolygonMode::Fill,
-                    unclipped_depth: false,
-                    conservative: false,
-                },
-                depth_stencil: None,
-                multisample: wgpu::MultisampleState {
-                    count: 1,
-                    mask: !0,
-                    alpha_to_coverage_enabled: false,
-                },
-                multiview: None,
-            })
-        };
-
         Self {
             surface,
             device,
             config,
             size,
             queue,
-            default_shader,
+            deafult_pipeline: None,
         }
     }
 
-    pub(crate) fn render(&self, objects: &[Object]) -> Result<(), wgpu::SurfaceError> {
+    pub fn add_default_pipeline(&mut self, camera: &Camera) {
+        let deafult_pipeline = {
+            let layout = self
+                .device
+                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("Default Shader Layout"),
+                    bind_group_layouts: &[&camera.get_render_data().unwrap().bind_group_layout],
+                    push_constant_ranges: &[],
+                });
+            let shader = wgpu::ShaderModuleDescriptor {
+                label: Some("Default Shader"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("default_shader.wgsl").into()),
+            };
+            let shader = self.device.create_shader_module(shader);
+            self.device
+                .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("Render Pipeline"),
+                    layout: Some(&layout),
+                    vertex: wgpu::VertexState {
+                        module: &shader,
+                        entry_point: "vs_main",
+                        buffers: &[Vertex::desc()],
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &shader,
+                        entry_point: "fs_main",
+                        targets: &[Some(wgpu::ColorTargetState {
+                            format: self.config.format,
+                            blend: Some(wgpu::BlendState {
+                                alpha: wgpu::BlendComponent::REPLACE,
+                                color: wgpu::BlendComponent::REPLACE,
+                            }),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })],
+                    }),
+                    primitive: wgpu::PrimitiveState {
+                        topology: wgpu::PrimitiveTopology::TriangleList,
+                        strip_index_format: None,
+                        front_face: wgpu::FrontFace::Ccw,
+                        cull_mode: Some(wgpu::Face::Back),
+                        polygon_mode: wgpu::PolygonMode::Fill,
+                        unclipped_depth: false,
+                        conservative: false,
+                    },
+                    depth_stencil: None,
+                    multisample: wgpu::MultisampleState {
+                        count: 1,
+                        mask: !0,
+                        alpha_to_coverage_enabled: false,
+                    },
+                    multiview: None,
+                })
+        };
+
+        self.deafult_pipeline = Some(deafult_pipeline);
+    }
+
+    pub(crate) fn render(
+        &self,
+        objects: &[Object],
+        camera: &Camera,
+    ) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
 
         let view = output
@@ -155,7 +169,17 @@ impl Renderer {
                 timestamp_writes: None,
             });
 
-            render_pass.set_pipeline(&self.default_shader);
+            if let Some(default_pipeline) = &self.deafult_pipeline {
+                render_pass.set_pipeline(default_pipeline);
+            }
+            if let Some(render_data) = camera.get_render_data() {
+                self.queue.write_buffer(
+                    &render_data.buffer,
+                    0,
+                    bytemuck::cast_slice(&[render_data.uniform]),
+                );
+                render_pass.set_bind_group(0, &render_data.bind_group, &[])
+            }
 
             for object in objects {
                 if object.pipeline.is_none() {

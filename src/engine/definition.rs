@@ -5,11 +5,7 @@ use winit::{
     window::{WindowBuilder, WindowId},
 };
 
-use crate::{
-    object::{self, Object},
-    pipeline::Pipeline,
-    renderer::Renderer,
-};
+use crate::{camera::Camera, object::Object, pipeline::Pipeline, renderer::Renderer};
 
 use super::Engine;
 
@@ -17,13 +13,16 @@ impl Default for Engine {
     fn default() -> Self {
         let event_loop = EventLoop::new();
         let window = WindowBuilder::new().build(&event_loop).unwrap();
-        let renderer = pollster::block_on(Renderer::new(&window));
+        let mut renderer = pollster::block_on(Renderer::new(&window));
         let objects = Vec::new();
+        let camera = Camera::new(&renderer.device, &renderer.config);
+        renderer.add_default_pipeline(&camera);
         Self {
             window,
             event_loop,
             renderer,
             objects,
+            camera,
         }
     }
 }
@@ -35,13 +34,14 @@ impl Engine {
 
     pub fn run<F>(self, mut function: F)
     where
-        F: 'static + FnMut(&WindowEvent<'_>, &mut ControlFlow),
+        F: 'static + FnMut(&WindowEvent<'_>, &mut ControlFlow, &mut Camera),
     {
         let Self {
             event_loop,
             window,
             mut renderer,
             objects,
+            mut camera,
         } = self;
 
         event_loop.run(move |event, _, control_flow| match event {
@@ -58,10 +58,11 @@ impl Engine {
                     }
                     _ => {}
                 }
-                function(event, control_flow)
+                function(event, control_flow, &mut camera)
             }
             Event::RedrawRequested(window_id) if window_id == window.id() => {
-                if renderer.render(&objects).is_err() {
+                camera.update_uniform();
+                if renderer.render(&objects, &camera).is_err() {
                     *control_flow = ControlFlow::Exit
                 }
             }
