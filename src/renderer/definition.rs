@@ -1,5 +1,7 @@
 use winit::window::Window;
 
+use crate::object::{Object, Vertex};
+
 use super::Renderer;
 
 impl Renderer {
@@ -59,16 +61,67 @@ impl Renderer {
 
         surface.configure(&device, &config);
 
+        let default_shader = {
+            let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Default Shader Layout"),
+                bind_group_layouts: &[],
+                push_constant_ranges: &[],
+            });
+            let shader = wgpu::ShaderModuleDescriptor {
+                label: Some("Default Shader"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("default_shader.wgsl").into()),
+            };
+            let shader = device.create_shader_module(shader);
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Render Pipeline"),
+                layout: Some(&layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: "vs_main",
+                    buffers: &[Vertex::desc()],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: "fs_main",
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: config.format,
+                        blend: Some(wgpu::BlendState {
+                            alpha: wgpu::BlendComponent::REPLACE,
+                            color: wgpu::BlendComponent::REPLACE,
+                        }),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: Some(wgpu::Face::Back),
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    unclipped_depth: false,
+                    conservative: false,
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+                multiview: None,
+            })
+        };
+
         Self {
             surface,
             device,
             config,
             size,
             queue,
+            default_shader,
         }
     }
 
-    pub fn render(&self) -> Result<(), wgpu::SurfaceError> {
+    pub(crate) fn render(&self, objects: &[Object]) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
 
         let view = output
@@ -82,7 +135,7 @@ impl Renderer {
             });
 
         {
-            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
@@ -101,6 +154,19 @@ impl Renderer {
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
+
+            render_pass.set_pipeline(&self.default_shader);
+
+            for object in objects {
+                if object.pipeline.is_none() {
+                    continue;
+                }
+                let pipeline = object.pipeline.as_ref().unwrap();
+                render_pass.set_vertex_buffer(0, pipeline.vertex_buffer.slice(..));
+                render_pass
+                    .set_index_buffer(pipeline.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+                render_pass.draw_indexed(0..object.indices.len() as u32, 0, 0..1);
+            }
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));

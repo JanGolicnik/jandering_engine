@@ -6,7 +6,9 @@ use winit::{
 fn main() {
     env_logger::init();
 
-    let engine = Engine::default();
+    let mut engine = Engine::default();
+
+    engine.add_object(jandering_engine::object::primitives::triangle());
 
     engine.run(move |ref event, control_flow| match event {
         WindowEvent::CloseRequested

@@ -9,7 +9,9 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+bytemuck = { version = "1.14", features = ["derive"] }
 env_logger = "0.10"
+glm = "0.2.3"
 log = "0.4"
 pollster = "0.3.0"
 wgpu = "0.18"
