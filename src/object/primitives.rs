@@ -1,36 +1,23 @@
-use super::{Object, Vertex};
+use super::{Object, VertexRaw};
 
 pub fn triangle() -> Object {
     Object {
         vertices: vec![
-            Vertex {
+            VertexRaw {
                 position: [0.0, 1.0, 0.0],
                 color: [0.0, 1.0, 0.0],
             },
-            Vertex {
+            VertexRaw {
                 position: [-1.0, -1.0, 0.0],
                 color: [1.0, 0.0, 0.0],
             },
-            Vertex {
+            VertexRaw {
                 position: [1.0, -1.0, 0.0],
                 color: [0.0, 0.0, 1.0],
             },
         ],
-        scale: cgmath::Vector3 {
-            x: 1.0,
-            y: 1.0,
-            z: 1.0,
-        },
-        rotation: cgmath::Vector3 {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-        },
-        position: cgmath::Vector3 {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-        },
+        instances: Vec::new(),
+        instance_data: Vec::new(),
         indices: vec![0, 1, 2],
         pipeline: None,
     }

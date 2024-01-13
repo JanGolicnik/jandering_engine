@@ -1,4 +1,4 @@
-use crate::camera::Camera;
+use crate::camera::{Camera, CameraRenderData};
 use crate::object::Object;
 use crate::renderer::Renderer;
 
@@ -9,5 +9,5 @@ pub struct Engine {
     event_loop: winit::event_loop::EventLoop<()>,
     renderer: Renderer,
     objects: Vec<Object>,
-    camera: Camera,
+    camera: (Camera, CameraRenderData),
 }

@@ -3,5 +3,7 @@ pub struct Pipeline {
     //
     pub index_buffer: wgpu::Buffer,
     //
+    pub instance_buffer: wgpu::Buffer,
+    //
     pub _shader: Option<wgpu::RenderPipeline>,
 }

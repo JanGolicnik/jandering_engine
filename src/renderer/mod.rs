@@ -5,6 +5,6 @@ pub struct Renderer {
     pub device: wgpu::Device,
     pub config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
-    queue: wgpu::Queue,
+    pub queue: wgpu::Queue,
     deafult_pipeline: Option<wgpu::RenderPipeline>,
 }

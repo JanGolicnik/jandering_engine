@@ -1,8 +1,8 @@
 use winit::window::Window;
 
 use crate::{
-    camera::Camera,
-    object::{Object, Vertex},
+    camera::CameraRenderData,
+    object::{InstanceRaw, Object, VertexRaw},
 };
 
 use super::Renderer;
@@ -74,13 +74,13 @@ impl Renderer {
         }
     }
 
-    pub fn add_default_pipeline(&mut self, camera: &Camera) {
+    pub fn add_default_pipeline(&mut self, camera: &CameraRenderData) {
         let deafult_pipeline = {
             let layout = self
                 .device
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("Default Shader Layout"),
-                    bind_group_layouts: &[&camera.get_render_data().unwrap().bind_group_layout],
+                    bind_group_layouts: &[&camera.bind_group_layout],
                     push_constant_ranges: &[],
                 });
             let shader = wgpu::ShaderModuleDescriptor {
@@ -95,7 +95,7 @@ impl Renderer {
                     vertex: wgpu::VertexState {
                         module: &shader,
                         entry_point: "vs_main",
-                        buffers: &[Vertex::desc()],
+                        buffers: &[VertexRaw::desc(), InstanceRaw::desc()],
                     },
                     fragment: Some(wgpu::FragmentState {
                         module: &shader,
@@ -134,7 +134,7 @@ impl Renderer {
     pub(crate) fn render(
         &self,
         objects: &[Object],
-        camera: &Camera,
+        camera: &CameraRenderData,
     ) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
 
@@ -172,24 +172,31 @@ impl Renderer {
             if let Some(default_pipeline) = &self.deafult_pipeline {
                 render_pass.set_pipeline(default_pipeline);
             }
-            if let Some(render_data) = camera.get_render_data() {
-                self.queue.write_buffer(
-                    &render_data.buffer,
-                    0,
-                    bytemuck::cast_slice(&[render_data.uniform]),
-                );
-                render_pass.set_bind_group(0, &render_data.bind_group, &[])
-            }
+            self.queue
+                .write_buffer(&camera.buffer, 0, bytemuck::cast_slice(&[camera.uniform]));
+            render_pass.set_bind_group(0, &camera.bind_group, &[]);
 
             for object in objects {
                 if object.pipeline.is_none() {
                     continue;
                 }
                 let pipeline = object.pipeline.as_ref().unwrap();
+
+                self.queue.write_buffer(
+                    &pipeline.instance_buffer,
+                    0,
+                    bytemuck::cast_slice(&object.instance_data),
+                );
+
                 render_pass.set_vertex_buffer(0, pipeline.vertex_buffer.slice(..));
+                render_pass.set_vertex_buffer(1, pipeline.instance_buffer.slice(..));
                 render_pass
                     .set_index_buffer(pipeline.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-                render_pass.draw_indexed(0..object.indices.len() as u32, 0, 0..1);
+                render_pass.draw_indexed(
+                    0..object.indices.len() as u32,
+                    0,
+                    0..object.instances.len() as u32,
+                );
             }
         }
 
