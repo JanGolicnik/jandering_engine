@@ -1,11 +1,11 @@
-use cgmath::SquareMatrix;
+use crate::{object::VertexRaw, renderer::Renderer};
+use cgmath::{EuclideanSpace, SquareMatrix};
+use wgpu::util::DeviceExt;
 
-use crate::object::VertexRaw;
-
-use super::{Instance, InstanceRaw, Object};
+use super::{Instance, InstanceRaw, Object, ObjectRenderData, Renderable};
 
 impl VertexRaw {
-    pub(crate) fn desc() -> wgpu::VertexBufferLayout<'static> {
+    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
         use std::mem;
 
         wgpu::VertexBufferLayout {
@@ -38,6 +38,28 @@ impl Default for Instance {
     }
 }
 
+impl Instance {
+    pub fn to_raw(&self) -> InstanceRaw {
+        let mut model = cgmath::Matrix4::<f32>::identity();
+
+        if let Some(scale) = self.scale {
+            model = cgmath::Matrix4::from_nonuniform_scale(scale.x, scale.y, scale.z) * model;
+        }
+
+        if let Some(rotation) = self.rotation {
+            model = cgmath::Matrix4::from(rotation) * model;
+        }
+
+        if let Some(position) = self.position {
+            model = cgmath::Matrix4::from_translation(position.to_vec()) * model;
+        }
+
+        InstanceRaw {
+            model: model.into(),
+        }
+    }
+}
+
 impl Default for InstanceRaw {
     fn default() -> Self {
         Self {
@@ -47,7 +69,7 @@ impl Default for InstanceRaw {
 }
 
 impl InstanceRaw {
-    pub(crate) fn desc() -> wgpu::VertexBufferLayout<'static> {
+    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
         use std::mem;
 
         wgpu::VertexBufferLayout {
@@ -77,38 +99,78 @@ impl InstanceRaw {
             ],
         }
     }
-
-    pub(crate) fn update(&mut self, instance: &Instance) {
-        let mut model = cgmath::Matrix4::<f32>::identity();
-        if let Some(rotation) = instance.rotation {
-            model = cgmath::Matrix4::from(rotation) * model;
-        }
-
-        if let Some(position) = instance.position {
-            model = cgmath::Matrix4::from_translation(position) * model;
-        }
-
-        if let Some(scale) = instance.scale {
-            model = cgmath::Matrix4::from_nonuniform_scale(scale.x, scale.y, scale.z) * model;
-        }
-
-        self.model = model.into();
-    }
 }
 
 impl Object {
-    pub fn update(&mut self) {
-        self.instance_data
-            .resize(self.instances.len(), InstanceRaw::default());
-
-        for (i, instance) in self
-            .instances
-            .iter_mut()
-            .enumerate()
-            .filter(|(_, e)| e.changed)
-        {
-            instance.changed = false;
-            self.instance_data[i].update(instance);
+    pub fn new(renderer: &Renderer) -> Self {
+        let vertex_buffer = renderer
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Vertex Buffer"),
+                contents: &[],
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+        let index_buffer = renderer
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Index Buffer"),
+                contents: &[],
+                usage: wgpu::BufferUsages::INDEX,
+            });
+        let instance_buffer =
+            renderer
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Instance Buffer"),
+                    contents: &[],
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                });
+        Self {
+            vertices: Vec::new(),
+            indices: Vec::new(),
+            instances: Vec::new(),
+            instance_data: Vec::new(),
+            render_data: Some(ObjectRenderData {
+                vertex_buffer,
+                index_buffer,
+                instance_buffer,
+            }),
+            shader: 0,
         }
+    }
+    pub fn update(&mut self) {
+        self.instance_data = self.instances.iter().map(|e| e.to_raw()).collect();
+    }
+}
+
+impl Renderable for Object {
+    fn bind<'a>(
+        &'a self,
+        render_pass: &mut wgpu::RenderPass<'a>,
+        _queue: &mut wgpu::Queue,
+        shaders: &'a [wgpu::RenderPipeline],
+    ) {
+        if self.render_data.is_none() {
+            println!("ey");
+            return;
+        }
+
+        if let Some(shader) = shaders.get(self.shader as usize) {
+            render_pass.set_pipeline(shader);
+        }
+
+        let render_data = self.render_data.as_ref().unwrap();
+
+        render_pass.set_vertex_buffer(0, render_data.vertex_buffer.slice(..));
+        render_pass.set_vertex_buffer(1, render_data.instance_buffer.slice(..));
+        render_pass.set_index_buffer(
+            render_data.index_buffer.slice(..),
+            wgpu::IndexFormat::Uint32,
+        );
+        render_pass.draw_indexed(
+            0..self.indices.len() as u32,
+            0,
+            0..self.instances.len() as u32,
+        );
     }
 }

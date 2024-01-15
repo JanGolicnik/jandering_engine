@@ -1,13 +1,13 @@
-use crate::camera::{Camera, CameraRenderData};
-use crate::object::Object;
+use crate::plugin::Plugin;
 use crate::renderer::Renderer;
 
+mod default_plugins;
 mod definition;
 
 pub struct Engine {
-    window: winit::window::Window,
+    pub window: winit::window::Window,
     event_loop: winit::event_loop::EventLoop<()>,
-    renderer: Renderer,
-    objects: Vec<Object>,
-    camera: (Camera, CameraRenderData),
+    pub renderer: Renderer,
+    pub plugins: Vec<Box<dyn Plugin>>,
+    pub shaders: Vec<wgpu::RenderPipeline>,
 }

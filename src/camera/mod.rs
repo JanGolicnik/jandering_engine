@@ -1,4 +1,4 @@
-mod constants;
+pub mod constants;
 mod definition;
 
 #[repr(C)]
@@ -21,9 +21,10 @@ pub struct CameraControllerData {
     forward_pressed: bool,
     backward_pressed: bool,
     is_shift_pressed: bool,
+    speed_multiplier: f32,
 }
 
-pub struct Camera {
+pub struct DefaultCameraPlugin {
     pub eye: cgmath::Point3<f32>,
     pub direction: cgmath::Vector3<f32>,
     pub up: cgmath::Vector3<f32>,
@@ -35,4 +36,6 @@ pub struct Camera {
     //
     velocity: cgmath::Vector3<f32>,
     controller: CameraControllerData,
+    //
+    render_data: Option<CameraRenderData>,
 }
