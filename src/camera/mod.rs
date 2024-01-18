@@ -15,27 +15,33 @@ pub struct CameraRenderData {
     pub buffer: wgpu::Buffer,
 }
 
-pub struct CameraControllerData {
-    right_pressed: bool,
-    left_pressed: bool,
-    forward_pressed: bool,
-    backward_pressed: bool,
-    is_shift_pressed: bool,
-    speed_multiplier: f32,
+pub struct FreeCameraController {
+    pub right_pressed: bool,
+    pub left_pressed: bool,
+    pub forward_pressed: bool,
+    pub backward_pressed: bool,
+    pub is_shift_pressed: bool,
+    pub speed_multiplier: f32,
+    pub velocity: cgmath::Vector3<f32>,
+
+    pub yaw: f32,
+    pub pitch: f32,
+}
+
+pub struct PerspectiveCameraData {
+    pub eye: cgmath::Point3<f32>,
+    pub direction: cgmath::Vector3<f32>,
+    //
+    pub fov: f32,
+    pub znear: f32,
+    pub zfar: f32,
+    pub aspect: f32,
 }
 
 pub struct DefaultCameraPlugin {
-    pub eye: cgmath::Point3<f32>,
-    pub direction: cgmath::Vector3<f32>,
-    pub up: cgmath::Vector3<f32>,
+    perspective: PerspectiveCameraData,
     //
-    fov: f32,
-    znear: f32,
-    zfar: f32,
-    aspect: f32,
-    //
-    velocity: cgmath::Vector3<f32>,
-    controller: CameraControllerData,
+    controller: FreeCameraController,
     //
     render_data: Option<CameraRenderData>,
 }

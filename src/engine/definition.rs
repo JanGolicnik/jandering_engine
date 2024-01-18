@@ -139,4 +139,9 @@ impl Engine {
             _ => {}
         });
     }
+
+    pub fn add_shader(&mut self, shader: wgpu::RenderPipeline) -> usize {
+        self.shaders.push(shader);
+        self.shaders.len() - 1
+    }
 }

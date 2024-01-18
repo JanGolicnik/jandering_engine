@@ -155,7 +155,7 @@ impl Renderable for Object {
             return;
         }
 
-        if let Some(shader) = shaders.get(self.shader as usize) {
+        if let Some(shader) = shaders.get(self.shader) {
             render_pass.set_pipeline(shader);
         }
 

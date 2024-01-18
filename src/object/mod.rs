@@ -5,8 +5,8 @@ pub mod primitives;
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct VertexRaw {
-    position: [f32; 3],
-    color: [f32; 3],
+    pub position: [f32; 3],
+    pub color: [f32; 3],
 }
 
 #[repr(C)]
@@ -42,7 +42,7 @@ pub struct Object {
     pub instance_data: Vec<InstanceRaw>,
     //
     pub render_data: Option<ObjectRenderData>,
-    pub shader: u32,
+    pub shader: usize,
 }
 
 pub trait Renderable {
