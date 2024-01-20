@@ -29,7 +29,7 @@ pub struct FreeCameraController {
 }
 
 pub struct PerspectiveCameraData {
-    pub eye: cgmath::Point3<f32>,
+    pub position: cgmath::Point3<f32>,
     pub direction: cgmath::Vector3<f32>,
     //
     pub fov: f32,

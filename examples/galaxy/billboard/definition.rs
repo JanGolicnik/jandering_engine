@@ -10,9 +10,15 @@ impl Renderable for Billboard {
     fn bind<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
-        _queue: &mut wgpu::Queue,
+        queue: &mut wgpu::Queue,
         shaders: &'a [wgpu::RenderPipeline],
     ) {
+        queue.write_buffer(
+            &self.render_data.instance_buffer,
+            0,
+            bytemuck::cast_slice(&self.instances),
+        );
+
         if let Some(shader) = shaders.get(self.shader) {
             render_pass.set_pipeline(shader);
         }
@@ -82,6 +88,15 @@ impl Billboard {
                 instance_buffer,
             },
             shader: 0,
+        }
+    }
+}
+
+impl Default for BillboardInstance {
+    fn default() -> Self {
+        Self {
+            size: 1.0,
+            position: [0.0; 3],
         }
     }
 }

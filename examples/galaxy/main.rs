@@ -10,14 +10,7 @@ fn main() {
 
     let mut engine = Engine::new(vec![Box::new(CustomCameraPlugin::new())]);
 
-    let instances = (-10..10)
-        .flat_map(|y| {
-            (-10..10).map(move |x| BillboardInstance {
-                position: [x as f32, y as f32, 0.0],
-                size: 1.0,
-            })
-        })
-        .collect::<Vec<_>>();
+    let instances = (0..500).map(|_| BillboardInstance::default()).collect();
 
     let mut star = Billboard::new(&engine.renderer, instances);
 
@@ -48,7 +41,7 @@ fn main() {
                 });
         let shader = wgpu::ShaderModuleDescriptor {
             label: Some("Star Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("triangle_shader.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(include_str!("star_shader.wgsl").into()),
         };
         let shader = engine.renderer.device.create_shader_module(shader);
         engine
@@ -97,9 +90,26 @@ fn main() {
             })
     });
 
-    let mut objects = vec![star];
+    let mut stars = vec![star];
 
-    engine.run(move |renderer, encoder, plugins, surface, shaders, _| {
-        renderer.render(&mut objects, encoder, plugins, surface, shaders);
+    let mut time = 0.0;
+
+    const SPEED: f32 = 0.3;
+
+    engine.run(move |renderer, encoder, plugins, surface, shaders, dt| {
+        time += dt;
+
+        let star = stars.first_mut().unwrap();
+        for (index, instance) in star.instances.iter_mut().enumerate() {
+            let radius = index as f32 * 0.2;
+            let speed = (index as f32).sqrt() * SPEED;
+            instance.position = [
+                (time as f32 * speed).sin() * radius,
+                0.0,
+                (time as f32 * speed).cos() * radius,
+            ]
+        }
+
+        renderer.render(&mut stars, encoder, plugins, surface, shaders);
     });
 }

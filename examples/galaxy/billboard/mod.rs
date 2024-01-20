@@ -5,9 +5,9 @@ use jandering_engine::object::{ObjectRenderData, VertexRaw};
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct BillboardInstance {
-    pub size: f32,
-    //
     pub position: [f32; 3],
+    //
+    pub size: f32,
 }
 
 pub struct Billboard {

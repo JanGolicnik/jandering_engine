@@ -51,7 +51,7 @@ impl Plugin for CustomCameraPlugin {
         ));
 
         self.controller.update(
-            &mut self.perspective.eye,
+            &mut self.perspective.position,
             &mut self.perspective.direction,
             dt,
         );
@@ -82,7 +82,7 @@ impl Default for CustomCameraPlugin {
     fn default() -> Self {
         Self {
             perspective: PerspectiveCameraData {
-                eye: cgmath::Point3 {
+                position: cgmath::Point3 {
                     x: 2.0,
                     y: 2.0,
                     z: 2.0,
@@ -107,18 +107,22 @@ impl Default for CustomCameraPlugin {
 
 impl CustomCameraPlugin {
     pub fn new() -> Self {
+        let position = cgmath::Point3 {
+            x: 2.0,
+            y: 2.0,
+            z: 2.0,
+        };
+        let target = cgmath::Point3 {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        };
+        let direction = target - position;
+
         Self {
             perspective: super::PerspectiveCameraData {
-                eye: cgmath::Point3 {
-                    x: 20.0,
-                    y: 2.0,
-                    z: 2.0,
-                },
-                direction: cgmath::Vector3 {
-                    x: 0.0,
-                    y: 0.0,
-                    z: -1.0,
-                },
+                position,
+                direction,
                 fov: 90.0,
                 znear: 0.1,
                 zfar: 100.0,
@@ -137,7 +141,7 @@ impl CustomCameraPlugin {
 
     pub fn update_uniform(&mut self) {
         let PerspectiveCameraData {
-            eye,
+            position: eye,
             direction,
             aspect,
             znear,
