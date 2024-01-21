@@ -10,7 +10,7 @@ fn main() {
 
     let mut engine = Engine::new(vec![Box::new(CustomCameraPlugin::new())]);
 
-    let instances = (0..500).map(|_| BillboardInstance::default()).collect();
+    let instances = (0..500_000).map(|_| BillboardInstance::default()).collect();
 
     let mut star = Billboard::new(&engine.renderer, instances);
 
@@ -101,7 +101,7 @@ fn main() {
 
         let star = stars.first_mut().unwrap();
         for (index, instance) in star.instances.iter_mut().enumerate() {
-            let radius = index as f32 * 0.2;
+            let radius = index as f32 * 0.0003;
             let speed = (index as f32).sqrt() * SPEED;
             instance.position = [
                 (time as f32 * speed).sin() * radius,
