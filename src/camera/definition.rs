@@ -1,4 +1,4 @@
-use cgmath::{Angle, SquareMatrix};
+use cgmath::{Angle, InnerSpace, SquareMatrix};
 use wgpu::{util::DeviceExt, BindGroupLayout};
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
@@ -284,7 +284,7 @@ impl FreeCameraController {
         direction.x = cgmath::Rad::cos(yaw_rad) * cgmath::Rad::cos(pitch_rad);
         direction.y = cgmath::Rad::sin(pitch_rad);
         direction.z = cgmath::Rad::sin(yaw_rad) * cgmath::Rad::cos(pitch_rad);
-        *object_direction = direction;
+        *object_direction = direction.normalize();
 
         let speed = CAMERA_SPEED * speed_multiplier * if is_shift_pressed { 2.0 } else { 1.0 };
         if left_pressed {

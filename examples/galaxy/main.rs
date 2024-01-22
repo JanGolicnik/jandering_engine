@@ -1,3 +1,5 @@
+use std::f32::consts::PI;
+
 use billboard::{Billboard, BillboardInstance};
 use custom_camera::CustomCameraPlugin;
 use jandering_engine::{engine::Engine, object::VertexRaw};
@@ -5,12 +7,16 @@ use jandering_engine::{engine::Engine, object::VertexRaw};
 mod billboard;
 mod custom_camera;
 
+const N_STARS_PER_ORBITAL: u32 = 250;
+const N_ORBITALS: u32 = 100;
+const N_STARS: u32 = N_ORBITALS * N_STARS_PER_ORBITAL;
+
 fn main() {
     env_logger::init();
 
     let mut engine = Engine::new(vec![Box::new(CustomCameraPlugin::new())]);
 
-    let instances = (0..500_000).map(|_| BillboardInstance::default()).collect();
+    let instances = (0..N_STARS).map(|_| BillboardInstance::default()).collect();
 
     let mut star = Billboard::new(&engine.renderer, instances);
 
@@ -94,19 +100,29 @@ fn main() {
 
     let mut time = 0.0;
 
-    const SPEED: f32 = 0.3;
-
     engine.run(move |renderer, encoder, plugins, surface, shaders, dt| {
         time += dt;
 
         let star = stars.first_mut().unwrap();
-        for (index, instance) in star.instances.iter_mut().enumerate() {
-            let radius = index as f32 * 0.0003;
-            let speed = (index as f32).sqrt() * SPEED;
+
+        for (mut index, instance) in star.instances.iter_mut().enumerate() {
+            let orbit = index as u32 / N_STARS_PER_ORBITAL + 1;
+            let index_in_orbit = index as u32 % N_STARS_PER_ORBITAL;
+
+            let radius = orbit as f32;
+
+            let speed = radius.powf(0.1) * 0.3;
+
+            let mut offset = (1.0 / N_STARS_PER_ORBITAL as f32) * index_in_orbit as f32;
+            offset *= PI * 2.0;
+
+            let radius_x = 1.0 + ((orbit as f32 / (time as f32 * 0.02)).sin() + 1.0) / 5.0;
+            let radius_y = 1.0 + ((orbit as f32 / (time as f32 * 0.02)).cos() + 1.0) / 5.0;
+
             instance.position = [
-                (time as f32 * speed).sin() * radius,
+                (time as f32 * speed + offset).sin() * radius_x * radius,
                 0.0,
-                (time as f32 * speed).cos() * radius,
+                (time as f32 * speed + offset).cos() * radius_y * radius,
             ]
         }
 
