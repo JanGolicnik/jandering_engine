@@ -3,11 +3,12 @@ use std::f32::consts::PI;
 use billboard::{Billboard, BillboardInstance};
 use custom_camera::CustomCameraPlugin;
 use jandering_engine::{engine::Engine, object::VertexRaw};
+use winit::dpi::PhysicalSize;
 
 mod billboard;
 mod custom_camera;
 
-const N_STARS_PER_ORBITAL: u32 = 250;
+const N_STARS_PER_ORBITAL: u32 = 1000;
 const N_ORBITALS: u32 = 100;
 const N_STARS: u32 = N_ORBITALS * N_STARS_PER_ORBITAL;
 
@@ -16,7 +17,13 @@ fn main() {
 
     let mut engine = Engine::new(vec![Box::new(CustomCameraPlugin::new())]);
 
-    let instances = (0..N_STARS).map(|_| BillboardInstance::default()).collect();
+    let instances = (0..N_STARS)
+        .enumerate()
+        .map(|(index, _)| BillboardInstance {
+            size: 1.0 - index as f32 / N_STARS as f32,
+            ..Default::default()
+        })
+        .collect();
 
     let mut star = Billboard::new(&engine.renderer, instances);
 
@@ -99,31 +106,37 @@ fn main() {
     let mut stars = vec![star];
 
     let mut time = 0.0;
+    engine.window.set_inner_size(PhysicalSize::new(1000, 1000));
 
     engine.run(move |renderer, encoder, plugins, surface, shaders, dt| {
         time += dt;
 
         let star = stars.first_mut().unwrap();
 
-        for (mut index, instance) in star.instances.iter_mut().enumerate() {
+        for (index, instance) in star.instances.iter_mut().enumerate() {
             let orbit = index as u32 / N_STARS_PER_ORBITAL + 1;
             let index_in_orbit = index as u32 % N_STARS_PER_ORBITAL;
 
             let radius = orbit as f32;
 
-            let speed = radius.powf(0.1) * 0.3;
+            // let speed = 0.0;
+            let speed = radius.powf(0.1) * 0.2;
 
             let mut offset = (1.0 / N_STARS_PER_ORBITAL as f32) * index_in_orbit as f32;
             offset *= PI * 2.0;
 
-            let radius_x = 1.0 + ((orbit as f32 / (time as f32 * 0.02)).sin() + 1.0) / 5.0;
-            let radius_y = 1.0 + ((orbit as f32 / (time as f32 * 0.02)).cos() + 1.0) / 5.0;
+            let x = (time as f32 * speed + offset).sin() * radius;
+            let y = (time as f32 * speed + offset).cos() * 0.7 * radius;
 
-            instance.position = [
-                (time as f32 * speed + offset).sin() * radius_x * radius,
-                0.0,
-                (time as f32 * speed + offset).cos() * radius_y * radius,
-            ]
+            let deg = orbit as f32 * (2.0 + time as f32 * 1.5);
+            let rad = deg * (PI / 180.0);
+            let angle_sin = rad.sin();
+            let angle_cos = rad.cos();
+
+            let rotated_x = x * angle_cos - y * angle_sin;
+            let rotated_y = x * angle_sin + y * angle_cos;
+
+            instance.position = [rotated_x, 0.0, rotated_y]
         }
 
         renderer.render(&mut stars, encoder, plugins, surface, shaders);

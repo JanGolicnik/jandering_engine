@@ -1,5 +1,6 @@
 use wgpu::CommandEncoder;
 use winit::{
+    dpi::PhysicalSize,
     event::{Event, WindowEvent},
     event_loop::EventLoop,
     window::{WindowBuilder, WindowId},

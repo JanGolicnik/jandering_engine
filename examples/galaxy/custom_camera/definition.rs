@@ -108,22 +108,22 @@ impl Default for CustomCameraPlugin {
 impl CustomCameraPlugin {
     pub fn new() -> Self {
         let position = cgmath::Point3 {
-            x: 2.0,
-            y: 2.0,
-            z: 2.0,
+            x: 100.0,
+            y: 100.0,
+            z: 100.0,
         };
         let target = cgmath::Point3 {
             x: 0.0,
             y: 0.0,
             z: 0.0,
         };
-        let direction = target - position;
+        let direction = (target - position).normalize();
 
         Self {
             perspective: super::PerspectiveCameraData {
                 position,
                 direction,
-                fov: 90.0,
+                fov: 45.0,
                 znear: 0.1,
                 zfar: 100.0,
                 aspect: 1.0,

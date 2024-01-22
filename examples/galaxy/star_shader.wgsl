@@ -29,7 +29,8 @@ fn vs_main(
 ) -> VertexOutput{
 
     // let world_pos = vec4(instance.position, 1.0) + camera.right * vertex.position.x * instance.size + camera.up * vertex.position.y * instance.size;
-    let world_pos =  vec4(instance.position, 1.0) + camera.right * vertex.position.x + camera.up * vertex.position.y;
+    let world_pos = vec4(instance.position, 1.0) + camera.right * vertex.position.x * instance.size + camera.up * vertex.position.y * instance.size;
+    // let world_pos =  vec4(instance.position, 1.0) + camera.right * vertex.position.x + camera.up * vertex.position.y;
     
     var out: VertexOutput;
     out.clip_position = camera.view_proj * world_pos;
