@@ -6,7 +6,7 @@ use winit::{
     window::Window,
 };
 
-use crate::{camera::DefaultCameraPlugin, plugin::Plugin, renderer::Renderer};
+use crate::{camera::DefaultCameraPlugin, plugins::Plugin, renderer::Renderer};
 
 use super::{
     constants::{CAMERA_SENSITIVITY, CAMERA_SPEED, CAMERA_UP, OPENGL_TO_WGPU_MATRIX},
@@ -54,24 +54,30 @@ impl Plugin for DefaultCameraPlugin {
         );
     }
 
-    fn pre_render(&mut self, queue: &mut wgpu::Queue) -> Option<(u32, &wgpu::BindGroup)> {
+    fn pre_render(&mut self, queue: &mut wgpu::Queue) {
         self.update_uniform();
 
         let render_data = &self.render_data.as_ref().unwrap();
-
         queue.write_buffer(
             &render_data.buffer,
             0,
             bytemuck::cast_slice(&[render_data.uniform]),
         );
-        Some((0, &render_data.bind_group))
     }
 
-    fn initialize(&mut self, renderer: &mut Renderer) -> Option<Vec<&BindGroupLayout>> {
+    fn initialize(&mut self, renderer: &mut Renderer) {
         self.perspective.aspect = renderer.config.width as f32 / renderer.config.height as f32;
         self.render_data = Some(CameraRenderData::new(&renderer.device));
+    }
+
+    fn get_bind_group_layouts(&self) -> Option<Vec<&BindGroupLayout>> {
         let render_data = &self.render_data.as_ref().unwrap();
         Some(vec![&render_data.bind_group_layout])
+    }
+
+    fn get_bind_groups(&self) -> Option<Vec<&wgpu::BindGroup>> {
+        let render_data = &self.render_data.as_ref().unwrap();
+        Some(vec![&render_data.bind_group])
     }
 }
 
@@ -134,7 +140,8 @@ impl DefaultCameraPlugin {
 
     pub fn update_uniform(&mut self) {
         let PerspectiveCameraData {
-            position: eye,
+            position,
+            direction,
             aspect,
             znear,
             zfar,
@@ -145,13 +152,12 @@ impl DefaultCameraPlugin {
         let render_data = self.render_data.as_mut().unwrap();
 
         render_data.uniform.view_proj = {
-            let view =
-                cgmath::Matrix4::look_at_rh(*eye, cgmath::Point3::new(0.0, 0.0, 0.0), CAMERA_UP);
+            let view = cgmath::Matrix4::look_at_rh(*position, position + direction, CAMERA_UP);
             let proj = cgmath::perspective(cgmath::Deg(*fov), *aspect, *znear, *zfar);
             OPENGL_TO_WGPU_MATRIX * proj * view
         }
         .into();
-        render_data.uniform.view_position = eye.to_homogeneous().into();
+        render_data.uniform.view_position = position.to_homogeneous().into();
     }
 }
 

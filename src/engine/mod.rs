@@ -1,4 +1,4 @@
-use crate::plugin::Plugin;
+use crate::plugins::Plugin;
 use crate::renderer::Renderer;
 
 mod default_plugins;

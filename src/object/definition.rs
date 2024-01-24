@@ -20,7 +20,7 @@ impl VertexRaw {
                 wgpu::VertexAttribute {
                     offset: mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
                     shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x3,
+                    format: wgpu::VertexFormat::Float32x2,
                 },
             ],
         }
@@ -151,7 +151,6 @@ impl Renderable for Object {
         shaders: &'a [wgpu::RenderPipeline],
     ) {
         if self.render_data.is_none() {
-            println!("ey");
             return;
         }
 
@@ -167,6 +166,7 @@ impl Renderable for Object {
             render_data.index_buffer.slice(..),
             wgpu::IndexFormat::Uint32,
         );
+
         render_pass.draw_indexed(
             0..self.indices.len() as u32,
             0,

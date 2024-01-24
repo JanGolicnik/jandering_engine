@@ -42,15 +42,15 @@ impl Billboard {
         let vertices = vec![
             VertexRaw {
                 position: [0.0, 1.0, 0.0],
-                color: [1.0, 1.0, 1.0],
+                uv: [1.0, 1.0],
             },
             VertexRaw {
                 position: [-1.0, -1.0, 0.0],
-                color: [1.0, 1.0, 1.0],
+                uv: [1.0, 1.0],
             },
             VertexRaw {
                 position: [1.0, -1.0, 0.0],
-                color: [1.0, 1.0, 1.0],
+                uv: [1.0, 1.0],
             },
         ];
         let vertex_buffer = renderer

@@ -15,3 +15,4 @@ I want to include things that may not necerssarily fall under a rendering engine
 - [ ] model loading
 - [ ] UI
 - [ ] PBR (deffered with forward transparency?)
+- [ ] skybox

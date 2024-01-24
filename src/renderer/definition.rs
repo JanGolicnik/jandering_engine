@@ -3,7 +3,7 @@ use winit::window::Window;
 
 use crate::{
     object::{InstanceRaw, Renderable, VertexRaw},
-    plugin::Plugin,
+    plugins::Plugin,
 };
 
 use super::Renderer;
@@ -131,12 +131,17 @@ impl Renderer {
             render_pass.set_pipeline(default_pipeline);
         }
 
-        let bind_groups: Vec<_> = plugins
+        // TODO: MOVE THIS OUT OF THIS FUNCTION
+        let bind_groups: Vec<&wgpu::BindGroup> = plugins
             .iter_mut()
-            .map(|e| e.pre_render(&mut self.queue))
+            .flat_map(|e| {
+                e.pre_render(&mut self.queue);
+                e.get_bind_groups()
+            })
+            .flatten()
             .collect();
-        for (index, bind_group) in bind_groups.into_iter().flatten() {
-            render_pass.set_bind_group(index, bind_group, &[]);
+        for (index, bind_group) in bind_groups.into_iter().enumerate() {
+            render_pass.set_bind_group(index as u32, bind_group, &[]);
         }
 
         for renderable in renderables {
@@ -196,8 +201,8 @@ impl Renderer {
                     topology: wgpu::PrimitiveTopology::TriangleList,
                     strip_index_format: None,
                     front_face: wgpu::FrontFace::Ccw,
-                    cull_mode: None,
-                    // cull_mode: Some(wgpu::Face::Back),
+                    // cull_mode: None,
+                    cull_mode: Some(wgpu::Face::Back),
                     polygon_mode: wgpu::PolygonMode::Fill,
                     unclipped_depth: false,
                     conservative: false,

@@ -16,6 +16,7 @@ fn main() {
     env_logger::init();
 
     let mut engine = Engine::new(vec![Box::new(CustomCameraPlugin::new())]);
+    engine.window.set_cursor_visible(false);
 
     let instances = (0..N_STARS)
         .enumerate()

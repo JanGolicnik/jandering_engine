@@ -1,12 +1,11 @@
 use wgpu::CommandEncoder;
 use winit::{
-    dpi::PhysicalSize,
     event::{Event, WindowEvent},
     event_loop::EventLoop,
     window::{WindowBuilder, WindowId},
 };
 
-use crate::{plugin::Plugin, renderer::Renderer};
+use crate::{plugins::Plugin, renderer::Renderer};
 
 use super::{default_plugins::default_plugins, Engine};
 
@@ -19,7 +18,10 @@ impl Default for Engine {
         let mut plugins = default_plugins();
         let bind_group_layouts: Vec<&wgpu::BindGroupLayout> = plugins
             .iter_mut()
-            .map(|e| e.initialize(&mut renderer))
+            .map(|e| {
+                e.initialize(&mut renderer);
+                e.get_bind_group_layouts()
+            })
             .filter(|e| e.is_some())
             .flat_map(|e| e.unwrap())
             .collect();
@@ -47,14 +49,16 @@ impl Engine {
 
         let bind_group_layouts: Vec<&wgpu::BindGroupLayout> = plugins
             .iter_mut()
-            .map(|e| e.initialize(&mut renderer))
+            .map(|e| {
+                e.initialize(&mut renderer);
+                e.get_bind_group_layouts()
+            })
             .filter(|e| e.is_some())
             .flat_map(|e| e.unwrap())
             .collect();
 
         let pipeline = renderer.create_pipeline(bind_group_layouts);
         let shaders = vec![pipeline];
-        window.set_cursor_visible(false);
         Self {
             window,
             event_loop,
@@ -144,5 +148,14 @@ impl Engine {
     pub fn add_shader(&mut self, shader: wgpu::RenderPipeline) -> usize {
         self.shaders.push(shader);
         self.shaders.len() - 1
+    }
+
+    pub fn get_bind_group_layouts(&self) -> Vec<&wgpu::BindGroupLayout> {
+        self.plugins
+            .iter()
+            .map(|e| e.get_bind_group_layouts())
+            .filter(|e| e.is_some())
+            .flat_map(|e| e.unwrap())
+            .collect()
     }
 }
