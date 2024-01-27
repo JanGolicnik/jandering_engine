@@ -10,9 +10,10 @@ I want to include things that may not necerssarily fall under a rendering engine
 - [x] instancing
 - [x] custom shaders
 - [x] custom cameras
-- [ ] proper plugins
+- [x] proper plugins
 - [ ] plugin having multiple bind groups based on shader ?
 - [ ] model loading
 - [ ] UI
 - [ ] PBR (deffered with forward transparency?)
 - [ ] skybox
+- [ ] wasm support

@@ -44,4 +44,7 @@ pub struct DefaultCameraPlugin {
     controller: FreeCameraController,
     //
     render_data: Option<CameraRenderData>,
+    //
+    #[cfg(target_arch = "wasm32")]
+    last_mouse_position: Option<(f32, f32)>,
 }

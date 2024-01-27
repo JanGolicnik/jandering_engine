@@ -9,10 +9,32 @@ use crate::{plugins::Plugin, renderer::Renderer};
 
 use super::{default_plugins::default_plugins, Engine};
 
+cfg_if::cfg_if! {
+    if #[cfg(target_arch = "wasm32")]{
+        use web_time::Instant;
+    }else{
+        use std::time::Instant;
+    }
+}
+
 impl Default for Engine {
     fn default() -> Self {
         let event_loop = EventLoop::new();
         let window = WindowBuilder::new().build(&event_loop).unwrap();
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            web_sys::window()
+                .and_then(|win| win.document())
+                .and_then(|doc| {
+                    let dst = doc.get_element_by_id("jandering-engine-canvas-body")?;
+                    let canvas = web_sys::Element::from(window.canvas());
+                    dst.append_child(&canvas).ok()?;
+                    Some(())
+                })
+                .expect("coulnt append canvas to document body");
+        }
+
         let mut renderer = pollster::block_on(Renderer::new(&window));
 
         let mut plugins = default_plugins();
@@ -41,6 +63,8 @@ impl Default for Engine {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+use winit::platform::web::WindowExtWebSys;
 impl Engine {
     pub fn new(mut plugins: Vec<Box<dyn Plugin>>) -> Self {
         let event_loop = EventLoop::new();
@@ -92,7 +116,8 @@ impl Engine {
             ..
         } = self;
 
-        let mut time = std::time::Instant::now();
+        #[allow(unused_assignments)]
+        let mut time = Instant::now();
         let mut last_time = time;
 
         event_loop.run(move |event, _, control_flow| match event {
@@ -116,7 +141,7 @@ impl Engine {
                     .for_each(|e| e.event(event, control_flow, &mut renderer, &window));
             }
             Event::RedrawRequested(window_id) if window_id == window.id() => {
-                time = std::time::Instant::now();
+                time = Instant::now();
                 let dt = (time - last_time).as_secs_f64();
                 last_time = time;
 
@@ -157,5 +182,10 @@ impl Engine {
             .filter(|e| e.is_some())
             .flat_map(|e| e.unwrap())
             .collect()
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn get_canvas(&self) -> web_sys::HtmlCanvasElement {
+        self.window.canvas()
     }
 }

@@ -1,7 +1,7 @@
 use cgmath::{Angle, InnerSpace, SquareMatrix};
 use wgpu::{util::DeviceExt, BindGroupLayout};
 use winit::{
-    dpi::{PhysicalPosition, PhysicalSize},
+    dpi::PhysicalSize,
     event::{ElementState, KeyboardInput, MouseScrollDelta, WindowEvent},
     window::Window,
 };
@@ -13,6 +13,7 @@ use super::{
     CameraRenderData, CameraUniform, FreeCameraController, PerspectiveCameraData,
 };
 
+#[allow(unused_variables)]
 impl Plugin for DefaultCameraPlugin {
     fn event(
         &mut self,
@@ -24,9 +25,20 @@ impl Plugin for DefaultCameraPlugin {
         self.controller.event(event);
 
         if let WindowEvent::CursorMoved { position, .. } = event {
-            let dx = position.x as f32 - renderer.config.width as f32 / 2.0;
-            let dy = position.y as f32 - renderer.config.height as f32 / 2.0;
+            cfg_if::cfg_if! {
+                if #[cfg(target_arch = "wasm32")]{
+                    let pos = self.last_mouse_position.unwrap_or((position.x as f32, position.y as f32));
+                    let dx = position.x as f32 - pos.0;
+                    let dy = position.y as f32 - pos.1;
+                    self.last_mouse_position = Some((position.x as f32, position.y as f32));
+                }else{
+                    let dx = position.x as f32 - renderer.config.width as f32 / 2.0;
+                    let dy = position.y as f32 - renderer.config.height as f32 / 2.0;
+                }
+            }
+
             self.controller.cursor_moved(dx, dy);
+            #[cfg(not(target_arch = "wasm32"))]
             window
                 .set_cursor_position(PhysicalPosition::new(
                     renderer.config.width / 2,
@@ -104,34 +116,15 @@ impl Default for DefaultCameraPlugin {
                 ..Default::default()
             },
             render_data: None,
+            #[cfg(target_arch = "wasm32")]
+            last_mouse_position: None,
         }
     }
 }
 
 impl DefaultCameraPlugin {
     pub fn new() -> Self {
-        Self {
-            perspective: super::PerspectiveCameraData {
-                position: cgmath::Point3 {
-                    x: 2.0,
-                    y: 2.0,
-                    z: 2.0,
-                },
-                direction: cgmath::Vector3 {
-                    x: 0.0,
-                    y: 0.0,
-                    z: -1.0,
-                },
-                fov: 45.0,
-                znear: 0.1,
-                zfar: 100.0,
-                aspect: 1.0,
-            },
-            controller: FreeCameraController {
-                ..Default::default()
-            },
-            render_data: None,
-        }
+        Self::default()
     }
 
     pub fn resize(&mut self, physical_size: PhysicalSize<u32>) {
