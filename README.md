@@ -16,4 +16,4 @@ I want to include things that may not necerssarily fall under a rendering engine
 - [ ] UI
 - [ ] PBR (deffered with forward transparency?)
 - [ ] skybox
-- [ ] wasm support
+- [x] wasm support (check out wasm branch)
