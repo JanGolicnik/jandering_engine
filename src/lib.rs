@@ -20,7 +20,7 @@ fn main() {
 
     let mut objects = vec![triangle];
 
-    engine.run(move |renderer, encoder, plugins, surface, shaders, _| {
+    engine.run(move |renderer, encoder, plugins, surface, shaders, _, _| {
         renderer.render(&mut objects, encoder, plugins, surface, shaders);
     });
 }
