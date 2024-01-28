@@ -1,7 +1,8 @@
 use cgmath::{Angle, InnerSpace, SquareMatrix};
 use wgpu::{util::DeviceExt, BindGroupLayout};
+#[allow(unused_imports)]
 use winit::{
-    dpi::PhysicalSize,
+    dpi::{PhysicalPosition, PhysicalSize},
     event::{ElementState, KeyboardInput, MouseScrollDelta, WindowEvent},
     window::Window,
 };
