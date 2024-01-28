@@ -1,7 +1,7 @@
 use wgpu::CommandEncoder;
 use winit::{
     event::{Event, WindowEvent},
-    event_loop::EventLoop,
+    event_loop::{ControlFlow, EventLoop},
     window::{WindowBuilder, WindowId},
 };
 
@@ -104,6 +104,7 @@ impl Engine {
                 &mut [Box<dyn Plugin>],
                 &mut wgpu::SurfaceTexture,
                 &mut [wgpu::RenderPipeline],
+                &mut ControlFlow,
                 f64,
             ),
     {
@@ -120,7 +121,7 @@ impl Engine {
         let mut time = Instant::now();
         let mut last_time = time;
 
-        event_loop.run(move |event, _, control_flow| match event {
+        event_loop.run(move |event, _, mut control_flow| match event {
             Event::WindowEvent {
                 ref event,
                 window_id,
@@ -158,6 +159,7 @@ impl Engine {
                     &mut plugins,
                     &mut surface,
                     &mut shaders,
+                    &mut control_flow,
                     dt,
                 );
 

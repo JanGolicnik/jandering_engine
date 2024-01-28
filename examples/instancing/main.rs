@@ -109,7 +109,7 @@ fn main() {
     let mut time = 0.0;
     engine.window.set_inner_size(PhysicalSize::new(1000, 1000));
 
-    engine.run(move |renderer, encoder, plugins, surface, shaders, dt| {
+    engine.run(move |renderer, encoder, plugins, surface, shaders, _, dt| {
         time += dt;
 
         let star = stars.first_mut().unwrap();
