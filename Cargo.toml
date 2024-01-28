@@ -1,0 +1,29 @@
+[package]
+name = "wgsltoy"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+console_error_panic_hook = "0.1.6"
+console_log = "1.0"
+wgpu = {verison = "0.18", features = ["webgl"]}
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = [
+    "Window",
+    "Element",
+    "HtmlInputElement",
+    "HtmlTextAreaElement",
+    "Document",
+]}
+reqwest = { version = "0.11" }
+log = "0.4.20"
+winit = "0.29.10"
+cgmath = "0.18.0"
+
+[dependencies.jandering_engine]
+path = "../jandering_engine"

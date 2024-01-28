@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>k k k kys</title>
+    <style>
+      canvas {
+        background-color: black;
+      }
+    </style>
+  </head>
+
+  <body id="jandering-engine-canvas-body">
+    
+    <input id="wgsltoy_updateshader" hidden="true"></input>
+    <textarea id="wgsltoy_shadercode"></textarea>
+    <button id="run_button">Run</button>
+
+    <script type="module" defer>
+      import initWasm, { run } from "./pkg/wgsltoy.js";
+      
+      initWasm().then(()=>{
+        run();
+      });
+
+      function send_shader(){
+        let input = document.getElementById("wgsltoy_updateshader");
+        input.value = "true";
+      }
+
+      document.getElementById("run_button").addEventListener('click', send_shader);
+    </script>
+
+  </body>
+</html>
