@@ -15,7 +15,11 @@ const N_STARS: u32 = N_ORBITALS * N_STARS_PER_ORBITAL;
 fn main() {
     env_logger::init();
 
-    let mut engine = Engine::new(vec![Box::new(CustomCameraPlugin::new())]);
+    let engine_descriptor = EngineDescriptor {
+        plugins: vec![Box::new(CustomCameraPlugin::new())],
+        ..Default::default()
+    };
+    let mut engine = Engine::new(engine_descriptor);
     engine.window.set_cursor_visible(false);
 
     let instances = (0..N_STARS)

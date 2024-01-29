@@ -70,7 +70,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32>{
         if(distance < 0.001 || t > 100.0){ break; }
     }
  
-    // let color = vec3<f32>(t * 0.02);
     let color = pallete(t * 0.02 + (f32(i) / 80.0) * 0.2 );
 
     return vec4<f32>(color, 1.0);

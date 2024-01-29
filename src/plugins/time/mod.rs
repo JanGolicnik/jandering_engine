@@ -6,6 +6,8 @@ use wgpu::util::DeviceExt;
 struct TimePluginUniform {
     dt: f32,
     time: f32,
+    #[cfg(target_arch = "wasm32")]
+    padding: [f32; 2],
 }
 
 struct TimePluginRenderData {
@@ -107,7 +109,12 @@ impl Plugin for TimePlugin {
 impl Default for TimePlugin {
     fn default() -> Self {
         Self {
-            uniform: TimePluginUniform { dt: 0.0, time: 0.0 },
+            uniform: TimePluginUniform {
+                dt: 0.0,
+                time: 0.0,
+                #[cfg(target_arch = "wasm32")]
+                padding: [0.0; 2],
+            },
             render_data: None,
         }
     }

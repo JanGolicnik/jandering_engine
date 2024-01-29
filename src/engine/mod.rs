@@ -11,3 +11,8 @@ pub struct Engine {
     pub plugins: Vec<Box<dyn Plugin>>,
     pub shaders: Vec<wgpu::RenderPipeline>,
 }
+
+pub struct EngineDescriptor {
+    pub plugins: Vec<Box<dyn Plugin>>,
+    pub resolution: (u32, u32),
+}

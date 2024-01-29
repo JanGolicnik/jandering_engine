@@ -1,5 +1,6 @@
 use wgpu::CommandEncoder;
 use winit::{
+    dpi::PhysicalSize,
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::{WindowBuilder, WindowId},
@@ -7,7 +8,7 @@ use winit::{
 
 use crate::{plugins::Plugin, renderer::Renderer};
 
-use super::{default_plugins::default_plugins, Engine};
+use super::{default_plugins::default_plugins, Engine, EngineDescriptor};
 
 cfg_if::cfg_if! {
     if #[cfg(target_arch = "wasm32")]{
@@ -66,23 +67,28 @@ impl Default for Engine {
 #[cfg(target_arch = "wasm32")]
 use winit::platform::web::WindowExtWebSys;
 impl Engine {
-    pub fn new(mut plugins: Vec<Box<dyn Plugin>>) -> Self {
+    pub fn new(desc: EngineDescriptor) -> Self {
         let event_loop = EventLoop::new();
         let window = WindowBuilder::new().build(&event_loop).unwrap();
+        window.set_inner_size(PhysicalSize::new(desc.resolution.0, desc.resolution.1));
+        #[cfg(target_arch = "wasm32")]
+        {
+            web_sys::window()
+                .and_then(|win| win.document())
+                .and_then(|doc| {
+                    let dst = doc.get_element_by_id("jandering-engine-canvas-body")?;
+                    let canvas = web_sys::Element::from(window.canvas());
+                    dst.append_child(&canvas).ok()?;
+                    Some(())
+                })
+                .expect("coulnt append canvas to document body");
+        }
         let mut renderer = pollster::block_on(Renderer::new(&window));
 
-        let bind_group_layouts: Vec<&wgpu::BindGroupLayout> = plugins
-            .iter_mut()
-            .map(|e| {
-                e.initialize(&mut renderer);
-                e.get_bind_group_layouts()
-            })
-            .filter(|e| e.is_some())
-            .flat_map(|e| e.unwrap())
-            .collect();
+        let mut plugins = desc.plugins;
+        plugins.iter_mut().for_each(|e| e.initialize(&mut renderer));
 
-        let pipeline = renderer.create_pipeline(bind_group_layouts);
-        let shaders = vec![pipeline];
+        let shaders = Vec::new();
         Self {
             window,
             event_loop,
@@ -103,7 +109,7 @@ impl Engine {
                 &mut CommandEncoder,
                 &mut [Box<dyn Plugin>],
                 &mut wgpu::SurfaceTexture,
-                &mut [wgpu::RenderPipeline],
+                &mut Vec<wgpu::RenderPipeline>,
                 &mut ControlFlow,
                 f64,
             ),
@@ -189,5 +195,14 @@ impl Engine {
     #[cfg(target_arch = "wasm32")]
     pub fn get_canvas(&self) -> web_sys::HtmlCanvasElement {
         self.window.canvas()
+    }
+}
+
+impl Default for EngineDescriptor {
+    fn default() -> Self {
+        Self {
+            plugins: Vec::new(),
+            resolution: (800, 800),
+        }
     }
 }

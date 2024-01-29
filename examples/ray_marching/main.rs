@@ -1,5 +1,5 @@
 use jandering_engine::{
-    engine::Engine,
+    engine::{Engine, EngineDescriptor},
     object::{primitives, Instance},
     plugins::{resolution::ResolutionPlugin, time::TimePlugin},
 };
@@ -7,14 +7,15 @@ use jandering_engine::{
 fn main() {
     env_logger::init();
 
-    let mut engine = Engine::new(vec![
-        Box::<TimePlugin>::default(),
-        Box::<ResolutionPlugin>::default(),
-    ]);
-
-    engine
-        .window
-        .set_inner_size(winit::dpi::PhysicalSize::new(1000, 1000));
+    let engine_descriptor = EngineDescriptor {
+        plugins: vec![
+            Box::<TimePlugin>::default(),
+            Box::<ResolutionPlugin>::default(),
+        ],
+        resolution: (1000, 1000),
+        ..Default::default()
+    };
+    let mut engine = Engine::new(engine_descriptor);
 
     let mut quad = primitives::quad(&engine.renderer, vec![Instance::default()]);
 

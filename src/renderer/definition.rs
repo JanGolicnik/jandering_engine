@@ -71,12 +71,7 @@ impl Renderer {
             config,
             size,
             queue,
-            deafult_pipeline: None,
         }
-    }
-
-    pub fn set_pipeline(&mut self, pipeline: RenderPipeline) {
-        self.deafult_pipeline = Some(pipeline);
     }
 
     pub fn begin_frame(
@@ -127,10 +122,6 @@ impl Renderer {
             timestamp_writes: None,
         });
 
-        if let Some(default_pipeline) = &self.deafult_pipeline {
-            render_pass.set_pipeline(default_pipeline);
-        }
-
         // TODO: MOVE THIS OUT OF THIS FUNCTION
         let bind_groups: Vec<&wgpu::BindGroup> = plugins
             .iter_mut()
@@ -140,6 +131,7 @@ impl Renderer {
             })
             .flatten()
             .collect();
+
         for (index, bind_group) in bind_groups.into_iter().enumerate() {
             render_pass.set_bind_group(index as u32, bind_group, &[]);
         }
