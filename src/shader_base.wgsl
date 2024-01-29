@@ -1,3 +1,12 @@
+struct Time {
+    dt: f32,
+    time: f32,
+    padding: vec2<f32>,
+};
+
+@group(0) @binding(0)
+var<uniform> time: Time;
+
 struct InstanceInput{
     @location(5) model_matrix_0: vec4<f32>,
     @location(6) model_matrix_1: vec4<f32>,
@@ -30,5 +39,5 @@ fn vs_main(
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32>{
-    return vec4<f32>(0.5, 0.5, 0.5, 1.0);
+    return vec4<f32>(sin(time.time), 0.5, 0.5, 1.0);
 }

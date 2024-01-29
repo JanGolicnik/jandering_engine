@@ -1,22 +1,21 @@
-use jandering_engine::object::*;
-use jandering_engine::renderer::*;
+use jandering_engine::engine::{Engine, EngineDescriptor};
+use jandering_engine::object::{primitives, Instance};
+use jandering_engine::renderer::Renderer;
 use wasm_bindgen::prelude::*;
+
 #[wasm_bindgen]
 pub fn run() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     console_log::init_with_level(log::Level::Info).expect("Coultn init");
 
-    let mut engine = jandering_engine::engine::Engine::new(Vec::new());
+    let engine_descriptor = EngineDescriptor {
+        plugins: vec![Box::<jandering_engine::plugins::time::TimePlugin>::default()],
+        resolution: (500, 500),
+        ..Default::default()
+    };
+    let mut engine = Engine::new(engine_descriptor);
 
     let mut quad = primitives::quad(&engine.renderer, vec![Instance::default()]);
-
-    let shader = shader_from_source(
-        include_str!("shader.wgsl").to_string(),
-        &engine.renderer,
-        engine.get_bind_group_layouts(),
-    );
-    quad.shader = engine.add_shader(shader);
-
     let mut objects = vec![quad];
 
     engine.run(move |renderer, encoder, plugins, surface, shaders, _, _| {
@@ -31,6 +30,7 @@ pub fn run() {
             shaders.push(new_shader);
             objects.first_mut().unwrap().shader = shaders.len() - 1;
         }
+
         renderer.render(&mut objects, encoder, plugins, surface, shaders);
     });
 }
@@ -85,9 +85,15 @@ fn shader_from_source(
         .device
         .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Shader Layout"),
-            bind_group_layouts: &[],
+            bind_group_layouts: &bind_group_layouts,
             push_constant_ranges: &[],
         });
+
+    let source = format!("{}", include_str!("shader_base.wgsl"));
+    // let source = format!("{}{source}", include_str!("shader.wgsl"));
+
+    log::info!("{}", source);
+
     let shader = wgpu::ShaderModuleDescriptor {
         label: Some("Shader"),
         source: wgpu::ShaderSource::Wgsl(source.into()),

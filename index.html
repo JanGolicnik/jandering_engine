@@ -10,13 +10,99 @@
         background-color: black;
       }
     </style>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto&family=Roboto+Mono&display=swap" rel="stylesheet">
+
+    <style>
+
+      :root {
+        --darkest-color: #252c4d;
+        --mid-color: #434b76;
+        --light-color: #81689D;
+        --main-color: #fff1fa;
+        --main-color-alpha: #fff1fab6;
+      }
+
+      html, body {
+          height: 100%;
+          width: auto;
+          overflow: hidden;
+          font-family: 'Roboto', sans-serif;
+          text-rendering: geometricPrecision;
+      }
+
+      #wgsltoy_shadercode{
+        max-width: 100%;
+        min-width: 100%;
+        min-height: 95vh;
+        max-height: 95vh;
+        word-wrap: unset;
+        padding: 1em;
+        background-color: var(--main-color);
+        border-radius: 5px;
+        font-size: 15px;
+        font-family: 'Roboto', sans-serif;
+        font-family: 'Roboto Mono', monospace;
+      }
+
+      body{
+        background: var(--darkest-color);
+        display: flex;
+      }
+
+      div#left_area {
+        min-width:40%;
+      }
+
+      div#right_area{
+        width: 100%;
+        display:flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+      }
+
+      div#jandering-engine-canvas-body{
+        background-color: var(--main-color);
+        justify-self: center;
+        box-shadow: 0px 0px 10px var(--main-color-alpha);
+        margin:0;
+        height: 500px;
+        padding:3px;
+        border-radius: 5px;
+      }
+
+      #refresh_button{
+        all:unset;
+        padding: 10px;
+        border-radius: 50%;
+        cursor: pointer;
+        margin: 10px;
+      }
+
+    </style>
   </head>
 
-  <body id="jandering-engine-canvas-body">
+  <body>
+    <input id="wgsltoy_updateshader" hidden="true" value="true"></input>
+    <div id="left_area">
+      <textarea id="wgsltoy_shadercode">
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32>{
+    return vec4<f32>(0.1, 0.5, 0.5, 1.0);
+}
+      </textarea>
+    </div>
     
-    <input id="wgsltoy_updateshader" hidden="true"></input>
-    <textarea id="wgsltoy_shadercode"></textarea>
-    <button id="run_button">Run</button>
+
+    <div id="right_area">
+      <div id="jandering-engine-canvas-body"></div>
+      <button id="refresh_button">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" stroke="none" fill="var(--main-color)"><path d="M13.5 2c-5.621 0-10.211 4.443-10.475 10h-3.025l5 6.625 5-6.625h-2.975c.257-3.351 3.06-6 6.475-6 3.584 0 6.5 2.916 6.5 6.5s-2.916 6.5-6.5 6.5c-1.863 0-3.542-.793-4.728-2.053l-2.427 3.216c1.877 1.754 4.389 2.837 7.155 2.837 5.79 0 10.5-4.71 10.5-10.5s-4.71-10.5-10.5-10.5z"/></svg>
+      </button>
+    </div>
 
     <script type="module" defer>
       import initWasm, { run } from "./pkg/wgsltoy.js";
@@ -30,7 +116,7 @@
         input.value = "true";
       }
 
-      document.getElementById("run_button").addEventListener('click', send_shader);
+      document.getElementById("refresh_button").addEventListener('click', send_shader);
     </script>
 
   </body>
