@@ -2,6 +2,7 @@ use jandering_engine::engine::{Engine, EngineDescriptor};
 use jandering_engine::object::{primitives, Instance};
 use jandering_engine::renderer::Renderer;
 use wasm_bindgen::prelude::*;
+use wgpu::UncapturedErrorHandler;
 
 #[wasm_bindgen]
 pub fn run() {
@@ -15,36 +16,60 @@ pub fn run() {
     };
     let mut engine = Engine::new(engine_descriptor);
 
+    engine
+        .renderer
+        .device
+        .on_uncaptured_error(Box::new(move |e| log::error!("{:?}", e)));
+
     let mut quad = primitives::quad(&engine.renderer, vec![Instance::default()]);
     let mut objects = vec![quad];
 
+    let doc = web_sys::window().and_then(|win| win.document()).unwrap();
+
     engine.run(move |renderer, encoder, plugins, surface, shaders, _, _| {
-        if let Some(new_shader) = get_shader() {
+        if let Some(new_shader) = get_shader(&doc) {
             let bind_group_layouts = plugins
                 .iter()
                 .map(|e| e.get_bind_group_layouts())
                 .filter(|e| e.is_some())
                 .flat_map(|e| e.unwrap())
                 .collect();
+            renderer
+                .device
+                .push_error_scope(wgpu::ErrorFilter::Validation);
             let new_shader = shader_from_source(new_shader, renderer, bind_group_layouts);
-            shaders.push(new_shader);
-            objects.first_mut().unwrap().shader = shaders.len() - 1;
+            if let Some(wgpu::Error::Validation { description, .. }) =
+                pollster::block_on(renderer.device.pop_error_scope())
+            {
+                print_error(&doc, description);
+                return;
+            }
+
+            if shaders.len() == 0 {
+                shaders.push(new_shader);
+            } else {
+                shaders[0] = new_shader;
+            }
         }
 
         renderer.render(&mut objects, encoder, plugins, surface, shaders);
     });
 }
 
-fn get_shader() -> Option<String> {
-    web_sys::window()
-        .and_then(|win| win.document())
-        .and_then(|doc| {
-            if should_update_shader(&doc) {
-                Some(get_shader_code(&doc))
-            } else {
-                None
-            }
-        })
+fn print_error(doc: &web_sys::Document, mut err: String) {
+    let el = doc
+        .get_element_by_id("wgsltoy_error_box")
+        .expect("should have #wgsltoy_error_box on the page");
+    err = err.replace("\n", "<br>");
+    el.set_inner_html(&err);
+}
+
+fn get_shader(doc: &web_sys::Document) -> Option<String> {
+    if should_update_shader(&doc) {
+        Some(get_shader_code(&doc))
+    } else {
+        None
+    }
 }
 
 fn get_shader_code(doc: &web_sys::Document) -> String {
@@ -89,10 +114,7 @@ fn shader_from_source(
             push_constant_ranges: &[],
         });
 
-    let source = format!("{}", include_str!("shader_base.wgsl"));
-    // let source = format!("{}{source}", include_str!("shader.wgsl"));
-
-    log::info!("{}", source);
+    let source = format!("{}{source}", include_str!("shader_base.wgsl"));
 
     let shader = wgpu::ShaderModuleDescriptor {
         label: Some("Shader"),
