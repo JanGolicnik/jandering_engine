@@ -2,7 +2,6 @@ use jandering_engine::engine::{Engine, EngineDescriptor};
 use jandering_engine::object::{primitives, Instance};
 use jandering_engine::renderer::Renderer;
 use wasm_bindgen::prelude::*;
-use wgpu::UncapturedErrorHandler;
 
 #[wasm_bindgen]
 pub fn run() {
@@ -10,18 +9,21 @@ pub fn run() {
     console_log::init_with_level(log::Level::Info).expect("Coultn init");
 
     let engine_descriptor = EngineDescriptor {
-        plugins: vec![Box::<jandering_engine::plugins::time::TimePlugin>::default()],
+        plugins: vec![
+            Box::<jandering_engine::plugins::time::TimePlugin>::default(),
+            Box::<jandering_engine::plugins::resolution::ResolutionPlugin>::default(),
+        ],
         resolution: (500, 500),
         ..Default::default()
     };
-    let mut engine = Engine::new(engine_descriptor);
+    let engine = Engine::new(engine_descriptor);
 
     engine
         .renderer
         .device
         .on_uncaptured_error(Box::new(move |e| log::error!("{:?}", e)));
 
-    let mut quad = primitives::quad(&engine.renderer, vec![Instance::default()]);
+    let quad = primitives::quad(&engine.renderer, vec![Instance::default()]);
     let mut objects = vec![quad];
 
     let doc = web_sys::window().and_then(|win| win.document()).unwrap();
@@ -43,6 +45,8 @@ pub fn run() {
             {
                 print_error(&doc, description);
                 return;
+            } else {
+                print_error(&doc, "".to_string());
             }
 
             if shaders.len() == 0 {

@@ -7,6 +7,15 @@ struct Time {
 @group(0) @binding(0)
 var<uniform> uTime: Time;
 
+struct Resolution {
+    res: vec2<f32>,
+    padding: vec2<f32>,
+};
+
+@group(1) @binding(0)
+var<uniform> uResolution: Resolution;
+
+
 struct InstanceInput{
     @location(5) model_matrix_0: vec4<f32>,
     @location(6) model_matrix_1: vec4<f32>,
