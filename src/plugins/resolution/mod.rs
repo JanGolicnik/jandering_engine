@@ -5,6 +5,8 @@ use wgpu::util::DeviceExt;
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct ResolutionPluginUniform {
     resolution: [f32; 2],
+    #[cfg(target_arch = "wasm32")]
+    padding: [f32; 2],
 }
 
 struct ResolutionPluginRenderData {
@@ -104,11 +106,23 @@ impl Plugin for ResolutionPlugin {
 
 impl Default for ResolutionPlugin {
     fn default() -> Self {
-        Self {
-            uniform: ResolutionPluginUniform {
-                resolution: [0.0, 0.0],
-            },
-            render_data: None,
+        cfg_if::cfg_if! {
+            if #[cfg(target_arch = "wasm32")]{
+                Self {
+                    uniform: ResolutionPluginUniform {
+                        resolution: [0.0, 0.0],
+                        padding: [0.0; 2]
+                    },
+                    render_data: None,
+                }
+            }else{
+                Self {
+                uniform: ResolutionPluginUniform {
+                    resolution: [0.0, 0.0],
+                    },
+                    render_data: None,
+                }
+            }
         }
     }
 }
