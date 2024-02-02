@@ -204,12 +204,16 @@ fn map(position: vec3<f32>) -> f32 {
         run();
       });
 
+      document.getElementById("refresh_button").addEventListener('click', send_shader);
+    </script>
+
+    <script defer>
       function send_shader(){
         let input = document.getElementById("wgsltoy_updateshader");
         input.value = "true";
       }
 
-      document.getElementById("refresh_button").addEventListener('click', send_shader);
+      setTimeout(send_shader, 10);
     </script>
 
   </body>

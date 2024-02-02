@@ -1,6 +1,7 @@
 use jandering_engine::engine::{Engine, EngineDescriptor};
-use jandering_engine::object::{primitives, Instance};
-use jandering_engine::renderer::Renderer;
+use jandering_engine::object::{primitives, Instance, InstanceRaw, VertexRaw};
+use jandering_engine::plugins::{resolution::ResolutionPlugin, time::TimePlugin, Plugin};
+use jandering_engine::shader::ShaderDescriptor;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -9,12 +10,7 @@ pub fn run() {
     console_log::init_with_level(log::Level::Info).expect("Coultn init");
 
     let engine_descriptor = EngineDescriptor {
-        plugins: vec![
-            Box::<jandering_engine::plugins::time::TimePlugin>::default(),
-            Box::<jandering_engine::plugins::resolution::ResolutionPlugin>::default(),
-        ],
         resolution: (500, 500),
-        ..Default::default()
     };
     let engine = Engine::new(engine_descriptor);
 
@@ -23,23 +19,33 @@ pub fn run() {
         .device
         .on_uncaptured_error(Box::new(move |e| log::error!("{:?}", e)));
 
+    let mut plugins: Vec<Box<dyn Plugin>> = vec![
+        Box::new(TimePlugin::new(&engine.renderer)),
+        Box::new(ResolutionPlugin::new(&engine.renderer)),
+    ];
+
+    let mut shader = None;
+
     let quad = primitives::quad(&engine.renderer, vec![Instance::default()]);
     let mut objects = vec![quad];
 
     let doc = web_sys::window().and_then(|win| win.document()).unwrap();
 
-    engine.run(move |renderer, encoder, plugins, surface, shaders, _, _| {
+    engine.run(move |context, renderer| {
         if let Some(new_shader) = get_shader(&doc) {
-            let bind_group_layouts = plugins
-                .iter()
-                .map(|e| e.get_bind_group_layouts())
-                .filter(|e| e.is_some())
-                .flat_map(|e| e.unwrap())
-                .collect();
             renderer
                 .device
                 .push_error_scope(wgpu::ErrorFilter::Validation);
-            let new_shader = shader_from_source(new_shader, renderer, bind_group_layouts);
+
+            shader = Some(jandering_engine::shader::create_shader(
+                renderer,
+                ShaderDescriptor {
+                    code: format!("{}{new_shader}", include_str!("shader_base.wgsl")).as_str(),
+                    descriptors: &[VertexRaw::desc(), InstanceRaw::desc()],
+                    plugins: &plugins,
+                },
+            ));
+
             if let Some(wgpu::Error::Validation { description, .. }) =
                 pollster::block_on(renderer.device.pop_error_scope())
             {
@@ -48,15 +54,12 @@ pub fn run() {
             } else {
                 print_error(&doc, "".to_string());
             }
-
-            if shaders.len() == 0 {
-                shaders.push(new_shader);
-            } else {
-                shaders[0] = new_shader;
-            }
         }
 
-        renderer.render(&mut objects, encoder, plugins, surface, shaders);
+        if let Some(shader) = shader.as_ref() {
+            plugins.iter_mut().for_each(|e| e.update(context, renderer));
+            renderer.render(&mut objects, context, &shader, &plugins);
+        }
     });
 }
 
@@ -103,72 +106,4 @@ fn should_update_shader(doc: &web_sys::Document) -> bool {
     }
 
     false
-}
-
-fn shader_from_source(
-    source: String,
-    renderer: &Renderer,
-    bind_group_layouts: Vec<&wgpu::BindGroupLayout>,
-) -> wgpu::RenderPipeline {
-    let layout = renderer
-        .device
-        .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Shader Layout"),
-            bind_group_layouts: &bind_group_layouts,
-            push_constant_ranges: &[],
-        });
-
-    let source = format!("{}{source}", include_str!("shader_base.wgsl"));
-
-    let shader = wgpu::ShaderModuleDescriptor {
-        label: Some("Shader"),
-        source: wgpu::ShaderSource::Wgsl(source.into()),
-    };
-    let shader = renderer.device.create_shader_module(shader);
-    renderer
-        .device
-        .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render Pipeline"),
-            layout: Some(&layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                buffers: &[
-                    jandering_engine::object::VertexRaw::desc(),
-                    jandering_engine::object::InstanceRaw::desc(),
-                ],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: renderer.config.format,
-                    blend: Some(wgpu::BlendState {
-                        alpha: wgpu::BlendComponent::OVER,
-                        color: wgpu::BlendComponent {
-                            src_factor: wgpu::BlendFactor::SrcAlpha,
-                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                            operation: wgpu::BlendOperation::Add,
-                        },
-                    }),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
-                polygon_mode: wgpu::PolygonMode::Fill,
-                unclipped_depth: false,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
-        })
 }
