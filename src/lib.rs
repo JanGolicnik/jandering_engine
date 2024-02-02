@@ -7,3 +7,5 @@ pub mod object;
 pub mod camera;
 
 pub mod plugins;
+
+pub mod shader;

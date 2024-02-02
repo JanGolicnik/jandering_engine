@@ -7,7 +7,7 @@ use winit::{
     window::Window,
 };
 
-use crate::{camera::DefaultCameraPlugin, plugins::Plugin, renderer::Renderer};
+use crate::{camera::DefaultCameraPlugin, plugins::Plugin};
 
 use super::{
     constants::{CAMERA_SENSITIVITY, CAMERA_SPEED, CAMERA_UP, OPENGL_TO_WGPU_MATRIX},
@@ -16,44 +16,18 @@ use super::{
 
 #[allow(unused_variables)]
 impl Plugin for DefaultCameraPlugin {
-    fn event(
-        &mut self,
-        event: &WindowEvent,
-        _control_flow: &mut winit::event_loop::ControlFlow,
-        renderer: &mut Renderer,
-        window: &Window,
-    ) {
-        self.controller.event(event);
+    fn get_bind_group_layout(&self) -> Option<&BindGroupLayout> {
+        Some(&self.render_data.bind_group_layout)
+    }
 
-        if let WindowEvent::CursorMoved { position, .. } = event {
-            cfg_if::cfg_if! {
-                if #[cfg(target_arch = "wasm32")]{
-                    let pos = self.last_mouse_position.unwrap_or((position.x as f32, position.y as f32));
-                    let dx = position.x as f32 - pos.0;
-                    let dy = position.y as f32 - pos.1;
-                    self.last_mouse_position = Some((position.x as f32, position.y as f32));
-                }else{
-                    let dx = position.x as f32 - renderer.config.width as f32 / 2.0;
-                    let dy = position.y as f32 - renderer.config.height as f32 / 2.0;
-                }
-            }
-
-            self.controller.cursor_moved(dx, dy);
-            #[cfg(not(target_arch = "wasm32"))]
-            window
-                .set_cursor_position(PhysicalPosition::new(
-                    renderer.config.width / 2,
-                    renderer.config.height / 2,
-                ))
-                .expect("failed to set cursor position");
-        }
+    fn get_bind_group(&self) -> Option<&wgpu::BindGroup> {
+        Some(&self.render_data.bind_group)
     }
 
     fn update(
         &mut self,
-        _control_flow: &mut winit::event_loop::ControlFlow,
-        renderer: &mut Renderer,
-        dt: f64,
+        context: &mut crate::engine::EngineContext,
+        renderer: &mut crate::renderer::Renderer,
     ) {
         self.resize(PhysicalSize::new(
             renderer.config.width,
@@ -63,39 +37,86 @@ impl Plugin for DefaultCameraPlugin {
         self.controller.update(
             &mut self.perspective.position,
             &mut self.perspective.direction,
-            dt,
+            context.dt,
         );
-    }
 
-    fn pre_render(&mut self, queue: &mut wgpu::Queue) {
         self.update_uniform();
 
-        let render_data = &self.render_data.as_ref().unwrap();
-        queue.write_buffer(
-            &render_data.buffer,
+        renderer.queue.write_buffer(
+            &self.render_data.buffer,
             0,
-            bytemuck::cast_slice(&[render_data.uniform]),
+            bytemuck::cast_slice(&[self.render_data.uniform]),
         );
-    }
-
-    fn initialize(&mut self, renderer: &mut Renderer) {
-        self.perspective.aspect = renderer.config.width as f32 / renderer.config.height as f32;
-        self.render_data = Some(CameraRenderData::new(&renderer.device));
-    }
-
-    fn get_bind_group_layouts(&self) -> Option<Vec<&BindGroupLayout>> {
-        let render_data = &self.render_data.as_ref().unwrap();
-        Some(vec![&render_data.bind_group_layout])
-    }
-
-    fn get_bind_groups(&self) -> Option<Vec<&wgpu::BindGroup>> {
-        let render_data = &self.render_data.as_ref().unwrap();
-        Some(vec![&render_data.bind_group])
     }
 }
 
-impl Default for DefaultCameraPlugin {
-    fn default() -> Self {
+impl DefaultCameraPlugin {
+    pub fn resize(&mut self, physical_size: PhysicalSize<u32>) {
+        self.perspective.aspect = physical_size.width as f32 / physical_size.height as f32;
+    }
+
+    pub fn update_uniform(&mut self) {
+        let PerspectiveCameraData {
+            position,
+            direction,
+            aspect,
+            znear,
+            zfar,
+            fov,
+            ..
+        } = &self.perspective;
+
+        self.render_data.uniform.view_proj = {
+            let view = cgmath::Matrix4::look_at_rh(*position, position + direction, CAMERA_UP);
+            let proj = cgmath::perspective(cgmath::Deg(*fov), *aspect, *znear, *zfar);
+            OPENGL_TO_WGPU_MATRIX * proj * view
+        }
+        .into();
+        self.render_data.uniform.view_position = position.to_homogeneous().into();
+    }
+
+    pub fn new(renderer: &crate::renderer::Renderer) -> Self {
+        let uniform = CameraUniform {
+            view_position: [0.0; 4],
+            view_proj: cgmath::Matrix4::identity().into(),
+        };
+
+        let buffer = renderer
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Camera Buffer"),
+                contents: bytemuck::cast_slice(&[uniform]),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
+
+        let bind_group_layout =
+            renderer
+                .device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    entries: &[wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    }],
+                    label: Some("model_bind_group_layout"),
+                });
+
+        let bind_group = renderer
+            .device
+            .create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &bind_group_layout,
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: buffer.as_entire_binding(),
+                }],
+                label: Some("camera_bind_group"),
+            });
+
         Self {
             perspective: PerspectiveCameraData {
                 position: cgmath::Point3 {
@@ -116,86 +137,14 @@ impl Default for DefaultCameraPlugin {
             controller: FreeCameraController {
                 ..Default::default()
             },
-            render_data: None,
+            render_data: CameraRenderData {
+                bind_group_layout,
+                bind_group,
+                uniform,
+                buffer,
+            },
             #[cfg(target_arch = "wasm32")]
             last_mouse_position: None,
-        }
-    }
-}
-
-impl DefaultCameraPlugin {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn resize(&mut self, physical_size: PhysicalSize<u32>) {
-        self.perspective.aspect = physical_size.width as f32 / physical_size.height as f32;
-    }
-
-    pub fn update_uniform(&mut self) {
-        let PerspectiveCameraData {
-            position,
-            direction,
-            aspect,
-            znear,
-            zfar,
-            fov,
-            ..
-        } = &self.perspective;
-
-        let render_data = self.render_data.as_mut().unwrap();
-
-        render_data.uniform.view_proj = {
-            let view = cgmath::Matrix4::look_at_rh(*position, position + direction, CAMERA_UP);
-            let proj = cgmath::perspective(cgmath::Deg(*fov), *aspect, *znear, *zfar);
-            OPENGL_TO_WGPU_MATRIX * proj * view
-        }
-        .into();
-        render_data.uniform.view_position = position.to_homogeneous().into();
-    }
-}
-
-impl CameraRenderData {
-    pub fn new(device: &wgpu::Device) -> Self {
-        let uniform = CameraUniform {
-            view_position: [0.0; 4],
-            view_proj: cgmath::Matrix4::identity().into(),
-        };
-
-        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Camera Buffer"),
-            contents: bytemuck::cast_slice(&[uniform]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-            label: Some("model_bind_group_layout"),
-        });
-
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: buffer.as_entire_binding(),
-            }],
-            label: Some("camera_bind_group"),
-        });
-
-        Self {
-            bind_group_layout,
-            bind_group,
-            uniform,
-            buffer,
         }
     }
 }

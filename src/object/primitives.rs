@@ -56,7 +56,6 @@ pub fn triangle(renderer: &Renderer, instances: Vec<Instance>) -> Object {
             index_buffer,
             instance_buffer,
         }),
-        shader: 0,
     }
 }
 
@@ -116,6 +115,5 @@ pub fn quad(renderer: &Renderer, instances: Vec<Instance>) -> Object {
             index_buffer,
             instance_buffer,
         }),
-        shader: 0,
     }
 }

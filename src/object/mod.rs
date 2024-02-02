@@ -42,14 +42,8 @@ pub struct Object {
     pub instance_data: Vec<InstanceRaw>,
     //
     pub render_data: Option<ObjectRenderData>,
-    pub shader: usize,
 }
 
 pub trait Renderable {
-    fn bind<'a>(
-        &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        queue: &mut wgpu::Queue,
-        shaders: &'a [wgpu::RenderPipeline],
-    );
+    fn bind<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, queue: &mut wgpu::Queue);
 }

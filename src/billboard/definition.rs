@@ -52,7 +52,7 @@ impl Billboard {
                 usage: wgpu::BufferUsages::VERTEX,
             });
 
-        let indices = vec![0, 2, 1];
+        let indices = vec![0, 1, 2];
         let index_buffer = renderer
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {

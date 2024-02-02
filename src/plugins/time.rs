@@ -1,5 +1,6 @@
-use crate::{plugins::Plugin, renderer::Renderer};
 use wgpu::util::DeviceExt;
+
+use crate::{engine::EngineContext, plugins::Plugin, renderer::Renderer};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -18,45 +19,44 @@ struct TimePluginRenderData {
 
 pub struct TimePlugin {
     uniform: TimePluginUniform,
-    render_data: Option<TimePluginRenderData>,
+    render_data: TimePluginRenderData,
 }
 
 impl Plugin for TimePlugin {
-    fn event(
-        &mut self,
-        _event: &winit::event::WindowEvent,
-        _control_flow: &mut winit::event_loop::ControlFlow,
-        _renderer: &mut Renderer,
-        _window: &winit::window::Window,
-    ) {
+    fn get_bind_group_layout(&self) -> Option<&wgpu::BindGroupLayout> {
+        Some(&self.render_data.bind_group_layout)
     }
 
-    fn update(
-        &mut self,
-        _control_flow: &mut winit::event_loop::ControlFlow,
-        _renderer: &mut Renderer,
-        dt: f64,
-    ) {
-        self.uniform.time += dt as f32;
-        self.uniform.dt = dt as f32;
+    fn get_bind_group(&self) -> Option<&wgpu::BindGroup> {
+        Some(&self.render_data.bind_group)
     }
 
-    fn pre_render(&mut self, queue: &mut wgpu::Queue) {
-        let render_data = self.render_data.as_ref().unwrap();
+    fn update(&mut self, context: &mut EngineContext, renderer: &mut Renderer) {
+        self.uniform.time += context.dt as f32;
+        self.uniform.dt = context.dt as f32;
 
-        queue.write_buffer(
-            &render_data.buffer,
+        renderer.queue.write_buffer(
+            &self.render_data.buffer,
             0,
             bytemuck::cast_slice(&[self.uniform]),
         );
     }
+}
 
-    fn initialize(&mut self, renderer: &mut Renderer) {
+impl TimePlugin {
+    pub fn new(renderer: &Renderer) -> Self {
+        let uniform = TimePluginUniform {
+            dt: 0.0,
+            time: 0.0,
+            #[cfg(target_arch = "wasm32")]
+            padding: [0.0; 2],
+        };
+
         let buffer = renderer
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Time Buffer"),
-                contents: bytemuck::cast_slice(&[self.uniform]),
+                contents: bytemuck::cast_slice(&[uniform]),
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             });
 
@@ -88,34 +88,13 @@ impl Plugin for TimePlugin {
                 label: Some("time_bind_group"),
             });
 
-        self.render_data = Some(TimePluginRenderData {
-            buffer,
-            bind_group_layout,
-            bind_group,
-        });
-    }
-
-    fn get_bind_group_layouts(&self) -> Option<Vec<&wgpu::BindGroupLayout>> {
-        let render_data = self.render_data.as_ref().unwrap();
-        Some(vec![&render_data.bind_group_layout])
-    }
-
-    fn get_bind_groups(&self) -> Option<Vec<&wgpu::BindGroup>> {
-        let render_data = self.render_data.as_ref().unwrap();
-        Some(vec![&render_data.bind_group])
-    }
-}
-
-impl Default for TimePlugin {
-    fn default() -> Self {
         Self {
-            uniform: TimePluginUniform {
-                dt: 0.0,
-                time: 0.0,
-                #[cfg(target_arch = "wasm32")]
-                padding: [0.0; 2],
+            uniform,
+            render_data: TimePluginRenderData {
+                buffer,
+                bind_group_layout,
+                bind_group,
             },
-            render_data: None,
         }
     }
 }

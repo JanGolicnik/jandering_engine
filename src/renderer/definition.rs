@@ -1,10 +1,6 @@
-use wgpu::{BindGroupLayout, RenderPipeline};
 use winit::window::Window;
 
-use crate::{
-    object::{InstanceRaw, Renderable, VertexRaw},
-    plugins::Plugin,
-};
+use crate::{engine::EngineContext, object::Renderable, plugins::Plugin, shader::Shader};
 
 use super::Renderer;
 
@@ -91,53 +87,49 @@ impl Renderer {
     pub fn render<T>(
         &mut self,
         renderables: &mut [T],
-        encoder: &mut wgpu::CommandEncoder,
-        plugins: &mut [Box<dyn Plugin>],
-        surface: &mut wgpu::SurfaceTexture,
-        shaders: &[wgpu::RenderPipeline],
+        context: &mut EngineContext,
+        shader: &Shader,
+        plugins: &[Box<dyn Plugin>],
     ) where
         T: Renderable,
     {
-        let view = surface
+        let view = context
+            .surface
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Render Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: 0.015,
-                        g: 0.007,
-                        b: 0.045,
-                        a: 1.0,
-                    }),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            occlusion_query_set: None,
-            timestamp_writes: None,
-        });
+        let mut render_pass = context
+            .encoder
+            .begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.015,
+                            g: 0.007,
+                            b: 0.045,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                occlusion_query_set: None,
+                timestamp_writes: None,
+            });
 
-        // TODO: MOVE THIS OUT OF THIS FUNCTION
-        let bind_groups: Vec<&wgpu::BindGroup> = plugins
-            .iter_mut()
-            .flat_map(|e| {
-                e.pre_render(&mut self.queue);
-                e.get_bind_groups()
-            })
-            .flatten()
-            .collect();
+        render_pass.set_pipeline(&shader.pipeline);
 
-        for (index, bind_group) in bind_groups.into_iter().enumerate() {
+        let bind_groups: Vec<_> = plugins.iter().flat_map(|e| e.get_bind_group()).collect();
+
+        for (index, bind_group) in bind_groups.iter().enumerate() {
             render_pass.set_bind_group(index as u32, bind_group, &[]);
         }
 
         for renderable in renderables {
-            renderable.bind(&mut render_pass, &mut self.queue, shaders);
+            renderable.bind(&mut render_pass, &mut self.queue);
         }
     }
 
@@ -153,59 +145,5 @@ impl Renderer {
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
         }
-    }
-
-    pub fn create_pipeline(&mut self, bind_group_layouts: Vec<&BindGroupLayout>) -> RenderPipeline {
-        let layout = self
-            .device
-            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Default Shader Layout"),
-                bind_group_layouts: &bind_group_layouts[..],
-                push_constant_ranges: &[],
-            });
-        let shader = wgpu::ShaderModuleDescriptor {
-            label: Some("Default Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("default_shader.wgsl").into()),
-        };
-        let shader = self.device.create_shader_module(shader);
-        self.device
-            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("Render Pipeline"),
-                layout: Some(&layout),
-                vertex: wgpu::VertexState {
-                    module: &shader,
-                    entry_point: "vs_main",
-                    buffers: &[VertexRaw::desc(), InstanceRaw::desc()],
-                },
-                fragment: Some(wgpu::FragmentState {
-                    module: &shader,
-                    entry_point: "fs_main",
-                    targets: &[Some(wgpu::ColorTargetState {
-                        format: self.config.format,
-                        blend: Some(wgpu::BlendState {
-                            alpha: wgpu::BlendComponent::REPLACE,
-                            color: wgpu::BlendComponent::REPLACE,
-                        }),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    })],
-                }),
-                primitive: wgpu::PrimitiveState {
-                    topology: wgpu::PrimitiveTopology::TriangleList,
-                    strip_index_format: None,
-                    front_face: wgpu::FrontFace::Ccw,
-                    // cull_mode: None,
-                    cull_mode: Some(wgpu::Face::Back),
-                    polygon_mode: wgpu::PolygonMode::Fill,
-                    unclipped_depth: false,
-                    conservative: false,
-                },
-                depth_stencil: None,
-                multisample: wgpu::MultisampleState {
-                    count: 1,
-                    mask: !0,
-                    alpha_to_coverage_enabled: false,
-                },
-                multiview: None,
-            })
     }
 }

@@ -39,10 +39,13 @@ fn vs_main(
 }
 
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32>{
+fn fs_main(in: VertexOutput, @builtin(front_facing) facing: bool) -> @location(0) vec4<f32>{
     let p = vec2<f32>(in.coords.x, in.coords.y + 0.23);
     var len = 1.0 - length(p);
     len = pow(len + 0.1, 17.0);
     var col = vec3<f32>(1.0);
+    if facing {
+        col = vec3<f32>(0.0, 1.0, 0.0);
+    }
     return vec4<f32>(col, clamp(len, 0.0, 1.0));
 }

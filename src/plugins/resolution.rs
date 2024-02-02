@@ -1,5 +1,6 @@
-use crate::{plugins::Plugin, renderer::Renderer};
 use wgpu::util::DeviceExt;
+
+use crate::plugins::Plugin;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -17,44 +18,47 @@ struct ResolutionPluginRenderData {
 
 pub struct ResolutionPlugin {
     uniform: ResolutionPluginUniform,
-    render_data: Option<ResolutionPluginRenderData>,
+    render_data: ResolutionPluginRenderData,
 }
 
 impl Plugin for ResolutionPlugin {
-    fn event(
-        &mut self,
-        _event: &winit::event::WindowEvent,
-        _control_flow: &mut winit::event_loop::ControlFlow,
-        _renderer: &mut Renderer,
-        _window: &winit::window::Window,
-    ) {
+    fn get_bind_group_layout(&self) -> Option<&wgpu::BindGroupLayout> {
+        Some(&self.render_data.bind_group_layout)
+    }
+
+    fn get_bind_group(&self) -> Option<&wgpu::BindGroup> {
+        Some(&self.render_data.bind_group)
     }
 
     fn update(
         &mut self,
-        _control_flow: &mut winit::event_loop::ControlFlow,
-        renderer: &mut Renderer,
-        _dt: f64,
+        _context: &mut crate::engine::EngineContext,
+        renderer: &mut crate::renderer::Renderer,
     ) {
         self.uniform.resolution[0] = renderer.config.width as f32;
         self.uniform.resolution[1] = renderer.config.height as f32;
-    }
 
-    fn pre_render(&mut self, queue: &mut wgpu::Queue) {
-        let render_data = self.render_data.as_ref().unwrap();
-        queue.write_buffer(
-            &render_data.buffer,
+        renderer.queue.write_buffer(
+            &self.render_data.buffer,
             0,
             bytemuck::cast_slice(&[self.uniform]),
         );
     }
+}
 
-    fn initialize(&mut self, renderer: &mut Renderer) {
+impl ResolutionPlugin {
+    pub fn new(renderer: &crate::renderer::Renderer) -> Self {
+        let uniform = ResolutionPluginUniform {
+            resolution: [renderer.config.width as f32, renderer.config.height as f32],
+            #[cfg(target_arch = "wasm32")]
+            padding: [0.0; 2],
+        };
+
         let buffer = renderer
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Resolution Buffer"),
-                contents: bytemuck::cast_slice(&[self.uniform]),
+                contents: bytemuck::cast_slice(&[uniform]),
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             });
 
@@ -86,43 +90,13 @@ impl Plugin for ResolutionPlugin {
                 label: Some("resolution_bind_group"),
             });
 
-        self.render_data = Some(ResolutionPluginRenderData {
-            buffer,
-            bind_group_layout,
-            bind_group,
-        });
-    }
-
-    fn get_bind_group_layouts(&self) -> Option<Vec<&wgpu::BindGroupLayout>> {
-        let render_data = self.render_data.as_ref().unwrap();
-        Some(vec![&render_data.bind_group_layout])
-    }
-
-    fn get_bind_groups(&self) -> Option<Vec<&wgpu::BindGroup>> {
-        let render_data = self.render_data.as_ref().unwrap();
-        Some(vec![&render_data.bind_group])
-    }
-}
-
-impl Default for ResolutionPlugin {
-    fn default() -> Self {
-        cfg_if::cfg_if! {
-            if #[cfg(target_arch = "wasm32")]{
-                Self {
-                    uniform: ResolutionPluginUniform {
-                        resolution: [0.0, 0.0],
-                        padding: [0.0; 2]
-                    },
-                    render_data: None,
-                }
-            }else{
-                Self {
-                uniform: ResolutionPluginUniform {
-                    resolution: [0.0, 0.0],
-                    },
-                    render_data: None,
-                }
-            }
+        Self {
+            uniform,
+            render_data: ResolutionPluginRenderData {
+                buffer,
+                bind_group_layout,
+                bind_group,
+            },
         }
     }
 }

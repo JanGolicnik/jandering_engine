@@ -135,7 +135,6 @@ impl Object {
                 index_buffer,
                 instance_buffer,
             }),
-            shader: 0,
         }
     }
     pub fn update(&mut self) {
@@ -144,18 +143,9 @@ impl Object {
 }
 
 impl Renderable for Object {
-    fn bind<'a>(
-        &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        _queue: &mut wgpu::Queue,
-        shaders: &'a [wgpu::RenderPipeline],
-    ) {
+    fn bind<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, _queue: &mut wgpu::Queue) {
         if self.render_data.is_none() {
             return;
-        }
-
-        if let Some(shader) = shaders.get(self.shader) {
-            render_pass.set_pipeline(shader);
         }
 
         let render_data = self.render_data.as_ref().unwrap();
