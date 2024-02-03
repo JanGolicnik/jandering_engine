@@ -1,7 +1,7 @@
 use jandering_engine::{
-    camera::DefaultCameraPlugin,
     engine::EngineDescriptor,
     object::{InstanceRaw, VertexRaw},
+    plugins::camera::free::DefaultCameraPlugin,
     plugins::Plugin,
 };
 use wasm_bindgen::prelude::*;
@@ -32,7 +32,8 @@ fn main() {
             })
         })
         .collect();
-    let triangle = jandering_engine::object::primitives::triangle(&engine.renderer, instances);
+    let triangle =
+        jandering_engine::object::primitives::triangle::<InstanceRaw>(&engine.renderer, instances);
     let mut objects = vec![triangle];
 
     engine.run(move |context, renderer| {
