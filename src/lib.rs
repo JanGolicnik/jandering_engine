@@ -26,7 +26,7 @@ pub fn run() {
 
     let mut shader = None;
 
-    let quad = primitives::quad(&engine.renderer, vec![Instance::default()]);
+    let quad = primitives::quad::<InstanceRaw>(&engine.renderer, vec![Instance::default()]);
     let mut objects = vec![quad];
 
     let doc = web_sys::window().and_then(|win| win.document()).unwrap();
@@ -58,7 +58,7 @@ pub fn run() {
 
         if let Some(shader) = shader.as_ref() {
             plugins.iter_mut().for_each(|e| e.update(context, renderer));
-            renderer.render(&mut objects, context, &shader, &plugins);
+            renderer.render(&mut objects, context, shader, &plugins);
         }
     });
 }
@@ -67,13 +67,13 @@ fn print_error(doc: &web_sys::Document, mut err: String) {
     let el = doc
         .get_element_by_id("wgsltoy_error_box")
         .expect("should have #wgsltoy_error_box on the page");
-    err = err.replace("\n", "<br>");
+    err = err.replace('\n', "<br>");
     el.set_inner_html(&err);
 }
 
 fn get_shader(doc: &web_sys::Document) -> Option<String> {
-    if should_update_shader(&doc) {
-        Some(get_shader_code(&doc))
+    if should_update_shader(doc) {
+        Some(get_shader_code(doc))
     } else {
         None
     }
