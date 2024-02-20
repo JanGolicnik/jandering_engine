@@ -1,8 +1,8 @@
 use jandering_engine::{
+    bind_group::camera::free::FreeCameraBindGroup,
     engine::EngineDescriptor,
-    object::{InstanceRaw, VertexRaw},
-    plugins::camera::free::DefaultCameraPlugin,
-    plugins::Plugin,
+    object::{Instance, VertexRaw},
+    types::{Mat4, UVec2, Vec3},
 };
 use wasm_bindgen::prelude::*;
 
@@ -12,32 +12,36 @@ fn main() {
     console_log::init_with_level(log::Level::Warn).expect("Coultn init");
     let mut engine = jandering_engine::engine::Engine::new(EngineDescriptor::default());
 
-    let mut plugins: Vec<Box<dyn Plugin>> =
-        vec![Box::new(DefaultCameraPlugin::new(&engine.renderer))];
+    let camera_bg = engine
+        .renderer
+        .add_bind_group(FreeCameraBindGroup::new(&engine.renderer));
 
-    let shader = jandering_engine::shader::default_shader(
+    let untyped_bind_groups = [camera_bg.into()];
+    let shader = jandering_engine::shader::create_shader(
         &mut engine.renderer,
         jandering_engine::shader::ShaderDescriptor {
-            code: "",
-            descriptors: &[VertexRaw::desc(), InstanceRaw::desc()],
-            plugins: &plugins,
+            descriptors: &[VertexRaw::desc(), Instance::desc()],
+            bind_groups: &untyped_bind_groups,
+            ..Default::default()
         },
     );
 
-    let instances = (0..100)
+    let instances = (-10..11)
         .flat_map(|x| {
-            (0..100).map(move |y| jandering_engine::object::Instance {
-                position: Some(cgmath::Point3::new(x as f32, 0.0, -y as f32)),
-                ..Default::default()
+            (-10..11).map(move |y| {
+                let model: Mat4 = Mat4::from_translation(Vec3::new(x as f32, 0.0, y as f32));
+                Instance { model }
             })
         })
         .collect();
-    let triangle =
-        jandering_engine::object::primitives::triangle::<InstanceRaw>(&engine.renderer, instances);
-    let mut objects = vec![triangle];
+
+    let triangle = jandering_engine::object::primitives::triangle(&engine.renderer, instances);
 
     engine.run(move |context, renderer| {
-        plugins.iter_mut().for_each(|e| e.update(context, renderer));
-        renderer.render(&mut objects, context, &shader, &plugins);
+        let resolution = UVec2::new(renderer.config.width, renderer.config.height);
+        let camera_bind_group = renderer.get_bind_group_t_mut(camera_bg).unwrap();
+        camera_bind_group.update(context, resolution);
+
+        renderer.render(&[&triangle], context, &shader, &untyped_bind_groups);
     });
 }
