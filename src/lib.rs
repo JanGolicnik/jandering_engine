@@ -1,6 +1,7 @@
+use jandering_engine::bind_group::resolution::ResolutionBindGroup;
+use jandering_engine::bind_group::time::TimeBindGroup;
 use jandering_engine::engine::{Engine, EngineDescriptor};
-use jandering_engine::object::{primitives, Instance, InstanceRaw, VertexRaw};
-use jandering_engine::plugins::{resolution::ResolutionPlugin, time::TimePlugin, Plugin};
+use jandering_engine::object::{primitives, Instance, VertexRaw};
 use jandering_engine::shader::ShaderDescriptor;
 use wasm_bindgen::prelude::*;
 
@@ -12,22 +13,24 @@ pub fn run() {
     let engine_descriptor = EngineDescriptor {
         resolution: (500, 500),
     };
-    let engine = Engine::new(engine_descriptor);
+    let mut engine = Engine::new(engine_descriptor);
 
     engine
         .renderer
         .device
         .on_uncaptured_error(Box::new(move |e| log::error!("{:?}", e)));
 
-    let mut plugins: Vec<Box<dyn Plugin>> = vec![
-        Box::new(TimePlugin::new(&engine.renderer)),
-        Box::new(ResolutionPlugin::new(&engine.renderer)),
-    ];
+    let time_bg = engine
+        .renderer
+        .add_bind_group(TimeBindGroup::new(&engine.renderer));
+    let resolution_bg = engine
+        .renderer
+        .add_bind_group(ResolutionBindGroup::new(&engine.renderer));
+    let bind_groups = [time_bg.into(), resolution_bg.into()];
 
     let mut shader = None;
 
-    let quad = primitives::quad::<InstanceRaw>(&engine.renderer, vec![Instance::default()]);
-    let mut objects = vec![quad];
+    let quad = primitives::quad(&engine.renderer, vec![Instance::default()]);
 
     let doc = web_sys::window().and_then(|win| win.document()).unwrap();
 
@@ -41,8 +44,9 @@ pub fn run() {
                 renderer,
                 ShaderDescriptor {
                     code: format!("{}{new_shader}", include_str!("shader_base.wgsl")).as_str(),
-                    descriptors: &[VertexRaw::desc(), InstanceRaw::desc()],
-                    plugins: &plugins,
+                    descriptors: &[VertexRaw::desc(), Instance::desc()],
+                    bind_groups: &bind_groups,
+                    ..Default::default()
                 },
             ));
 
@@ -51,14 +55,16 @@ pub fn run() {
             {
                 print_error(&doc, description);
                 return;
-            } else {
-                print_error(&doc, "".to_string());
             }
+
+            print_error(&doc, "".to_string());
         }
 
         if let Some(shader) = shader.as_ref() {
-            plugins.iter_mut().for_each(|e| e.update(context, renderer));
-            renderer.render(&mut objects, context, shader, &plugins);
+            let time_bind_group: &mut TimeBindGroup =
+                renderer.get_bind_group_t_mut(time_bg).unwrap();
+            time_bind_group.update(context.dt as f32);
+            renderer.render(&[&quad], context, shader, &bind_groups);
         }
     });
 }

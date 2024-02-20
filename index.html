@@ -114,7 +114,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32>{
         let rotated_xy = position.xy * rot2D(t * cos_sin_time * percent) * cos_sin_time * cos_sin_time;
         position.x = rotated_xy.x;
         position.y = rotated_xy.y;
-
+        position *= (f32(i) / 80.0);
+        
         let distance = map(position);
 
         t += distance;
