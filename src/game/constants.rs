@@ -1,0 +1,8 @@
+pub const TILE_SIZE: f32 = 50.0;
+pub const RESOLUTION_Y: f32 = TILE_SIZE * 10.0;
+pub const RESOLUTION_X: f32 = TILE_SIZE * 20.0;
+pub const HALF_TILE_SIZE: f32 = TILE_SIZE * 0.5;
+pub const JUMP_HEIGHT: f32 = 3.0;
+pub const JUMP_HEIGHT_PIXELS: f32 = TILE_SIZE * JUMP_HEIGHT;
+pub const JUMP_DURATION: f32 = 0.5;
+pub const GRAVITY: f32 = -JUMP_HEIGHT_PIXELS / (0.5 * JUMP_DURATION * JUMP_DURATION);
