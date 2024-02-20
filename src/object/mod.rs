@@ -1,3 +1,7 @@
+use std::ops::Range;
+
+use crate::types::*;
+
 pub mod constants;
 mod definition;
 pub mod primitives;
@@ -5,24 +9,22 @@ pub mod primitives;
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct VertexRaw {
-    pub position: [f32; 3],
-    pub uv: [f32; 2],
+    pub position: Vec3,
+    pub uv: Vec2,
 }
 
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct InstanceRaw {
-    pub model: [[f32; 4]; 4],
+pub struct Instance {
+    pub model: Mat4,
 }
 
-pub struct Instance {
-    pub scale: Option<cgmath::Vector3<f32>>,
-    //
-    pub position: Option<cgmath::Point3<f32>>,
-    //
-    pub rotation: Option<cgmath::Quaternion<f32>>,
-    //
-    pub changed: bool,
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct D2Instance {
+    pub position: Vec2,
+    pub scale: Vec2,
+    pub rotation: f32,
 }
 
 pub struct ObjectRenderData {
@@ -33,17 +35,18 @@ pub struct ObjectRenderData {
     pub instance_buffer: wgpu::Buffer,
 }
 
-pub struct Object {
+pub struct Object<T> {
     pub vertices: Vec<VertexRaw>,
     //
     pub indices: Vec<u32>,
     //
-    pub instances: Vec<Instance>,
-    pub instance_data: Vec<InstanceRaw>,
+    pub instances: Vec<T>,
     //
     pub render_data: Option<ObjectRenderData>,
 }
 
 pub trait Renderable {
-    fn bind<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, queue: &mut wgpu::Queue);
+    fn bind<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, range: Range<u32>);
+
+    fn num_instances(&self) -> u32;
 }

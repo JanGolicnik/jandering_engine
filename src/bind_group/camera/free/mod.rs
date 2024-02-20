@@ -1,19 +1,8 @@
+use super::CameraUniform;
+use crate::bind_group::BindGroupRenderData;
+
 pub mod constants;
 mod definition;
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct CameraUniform {
-    view_position: [f32; 4],
-    view_proj: [[f32; 4]; 4],
-}
-
-pub struct CameraRenderData {
-    pub bind_group_layout: wgpu::BindGroupLayout,
-    pub bind_group: wgpu::BindGroup,
-    pub uniform: CameraUniform,
-    pub buffer: wgpu::Buffer,
-}
 
 pub struct FreeCameraController {
     pub right_pressed: bool,
@@ -38,12 +27,13 @@ pub struct PerspectiveCameraData {
     pub aspect: f32,
 }
 
-pub struct DefaultCameraPlugin {
+pub struct FreeCameraBindGroup {
     perspective: PerspectiveCameraData,
     //
     controller: FreeCameraController,
     //
-    render_data: CameraRenderData,
+    uniform: CameraUniform,
+    render_data: BindGroupRenderData,
     //
     #[allow(dead_code)]
     #[cfg(target_arch = "wasm32")]

@@ -7,15 +7,19 @@ use winit::{
     window::Window,
 };
 
-use crate::{camera::DefaultCameraPlugin, plugins::Plugin};
-
+use super::FreeCameraBindGroup;
 use super::{
     constants::{CAMERA_SENSITIVITY, CAMERA_SPEED, CAMERA_UP, OPENGL_TO_WGPU_MATRIX},
-    CameraRenderData, CameraUniform, FreeCameraController, PerspectiveCameraData,
+    BindGroupRenderData, FreeCameraController, PerspectiveCameraData,
+};
+use crate::{
+    bind_group::{camera::CameraUniform, BindGroup, BindGroupWriteData},
+    engine::EngineContext,
+    types::UVec2,
 };
 
 #[allow(unused_variables)]
-impl Plugin for DefaultCameraPlugin {
+impl BindGroup for FreeCameraBindGroup {
     fn get_bind_group_layout(&self) -> Option<&BindGroupLayout> {
         Some(&self.render_data.bind_group_layout)
     }
@@ -24,33 +28,18 @@ impl Plugin for DefaultCameraPlugin {
         Some(&self.render_data.bind_group)
     }
 
-    fn update(
-        &mut self,
-        context: &mut crate::engine::EngineContext,
-        renderer: &mut crate::renderer::Renderer,
-    ) {
-        self.resize(PhysicalSize::new(
-            renderer.config.width,
-            renderer.config.height,
-        ));
-
-        self.controller.update(
-            &mut self.perspective.position,
-            &mut self.perspective.direction,
-            context.dt,
-        );
-
+    fn write(&mut self, data: &BindGroupWriteData) {
         self.update_uniform();
 
-        renderer.queue.write_buffer(
+        data.queue.write_buffer(
             &self.render_data.buffer,
             0,
-            bytemuck::cast_slice(&[self.render_data.uniform]),
+            bytemuck::cast_slice(&[self.uniform]),
         );
     }
 }
 
-impl DefaultCameraPlugin {
+impl FreeCameraBindGroup {
     pub fn resize(&mut self, physical_size: PhysicalSize<u32>) {
         self.perspective.aspect = physical_size.width as f32 / physical_size.height as f32;
     }
@@ -66,13 +55,13 @@ impl DefaultCameraPlugin {
             ..
         } = &self.perspective;
 
-        self.render_data.uniform.view_proj = {
+        self.uniform.view_proj = {
             let view = cgmath::Matrix4::look_at_rh(*position, position + direction, CAMERA_UP);
             let proj = cgmath::perspective(cgmath::Deg(*fov), *aspect, *znear, *zfar);
             OPENGL_TO_WGPU_MATRIX * proj * view
         }
         .into();
-        self.render_data.uniform.view_position = position.to_homogeneous().into();
+        self.uniform.view_position = position.to_homogeneous().into();
     }
 
     pub fn new(renderer: &crate::renderer::Renderer) -> Self {
@@ -137,15 +126,51 @@ impl DefaultCameraPlugin {
             controller: FreeCameraController {
                 ..Default::default()
             },
-            render_data: CameraRenderData {
+            render_data: BindGroupRenderData {
                 bind_group_layout,
                 bind_group,
-                uniform,
                 buffer,
             },
+            uniform,
             #[cfg(target_arch = "wasm32")]
             last_mouse_position: None,
         }
+    }
+
+    pub fn update(&mut self, context: &EngineContext, resolution: UVec2) {
+        self.resize(PhysicalSize::new(resolution.x, resolution.y));
+        for event in context.events.iter() {
+            self.controller.event(event);
+
+            if let winit::event::WindowEvent::CursorMoved { position, .. } = event {
+                cfg_if::cfg_if! {
+                    if #[cfg(target_arch = "wasm32")]{
+                        let last_mouse_position = self.last_mouse_position.unwrap_or((position.x as f32, position.y as f32));
+                        let dx = position.x as f32 - last_mouse_position.0;
+                        let dy = position.y as f32 - last_mouse_position.1;
+                        self.last_mouse_position = Some((position.x as f32, position.y as f32));
+                    }else{
+                        let dx = position.x as f32 - resolution.x as f32 / 2.0;
+                        let dy = position.y as f32 - resolution.y as f32 / 2.0;
+                        context
+                            .window
+                            .set_cursor_position(winit::dpi::PhysicalPosition::new(
+                                resolution.x / 2,
+                                resolution.y / 2,
+                            ))
+                            .expect("failed to set cursor position");
+                    }
+                }
+
+                self.controller.cursor_moved(dx, dy);
+            }
+        }
+
+        self.controller.update(
+            &mut self.perspective.position,
+            &mut self.perspective.direction,
+            context.dt,
+        );
     }
 }
 

@@ -10,6 +10,7 @@ I want to include things that may not necerssarily fall under a rendering engine
 - [ray marching example](https://github.com/JanGolicnik/jandering_engine/tree/maste/examples/ray_marching) -> example ray marching following [this](https://youtu.be/khblXafu7iA?si=WbOveB6sX3Wdz3dF) tutorial
 - [wasm template](https://github.com/JanGolicnik/jandering_engine/tree/wasm) -> template for creating wasm projects
 - [wgsltoy](https://janyg.itch.io/wgsltoy) -> real time wgsl shader editor like Shader Toy
+- [dashy geometry](https://janyg.itch.io/wgsltoy)(geometry dash clone) -> geometry dash with map editing and bloom
 
 ## Checklist
 
@@ -17,10 +18,10 @@ I want to include things that may not necerssarily fall under a rendering engine
 - [x] instancing
 - [x] custom shaders
 - [x] custom cameras
-- [ ] proper plugins
-- [ ] plugin having multiple bind groups based on shader ?
+- [x] proper bind groups
 - [ ] model loading
 - [ ] UI
 - [ ] PBR (deffered with forward transparency?)
 - [ ] skybox
 - [x] wasm support (check out wasm branch)
+- [x] textures

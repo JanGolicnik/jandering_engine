@@ -1,28 +1,29 @@
 use wgpu::util::DeviceExt;
 
+use super::{Object, VertexRaw};
 use crate::renderer::Renderer;
+use crate::types::*;
 
-use super::{Instance, InstanceRaw, Object, VertexRaw};
-
-pub fn triangle(renderer: &Renderer, instances: Vec<Instance>) -> Object {
+pub fn triangle<T>(renderer: &Renderer, instances: Vec<T>) -> Object<T>
+where
+    T: bytemuck::Pod,
+{
     let vertices = vec![
         VertexRaw {
-            position: [0.0, 1.0, 0.0],
-            uv: [1.0, 1.0],
+            position: Vec3::new(0.0, 1.0, 0.0),
+            uv: Vec2::new(1.0, 1.0),
         },
         VertexRaw {
-            position: [1.0, -1.0, 0.0],
-            uv: [1.0, 0.0],
+            position: Vec3::new(1.0, -1.0, 0.0),
+            uv: Vec2::new(1.0, 0.0),
         },
         VertexRaw {
-            position: [-1.0, -1.0, 0.0],
-            uv: [0.0, 1.0],
+            position: Vec3::new(-1.0, -1.0, 0.0),
+            uv: Vec2::new(0.0, 1.0),
         },
     ];
 
-    let instance_data: Vec<InstanceRaw> = instances.iter().map(|e| e.to_raw()).collect();
-
-    let indices = vec![0, 2, 1];
+    let indices = vec![0, 1, 2];
 
     let vertex_buffer = renderer
         .device
@@ -42,7 +43,7 @@ pub fn triangle(renderer: &Renderer, instances: Vec<Instance>) -> Object {
         .device
         .create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Instance Buffer"),
-            contents: bytemuck::cast_slice(&instance_data),
+            contents: bytemuck::cast_slice(&instances),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -50,7 +51,6 @@ pub fn triangle(renderer: &Renderer, instances: Vec<Instance>) -> Object {
         vertices,
         indices,
         instances,
-        instance_data,
         render_data: Some(super::ObjectRenderData {
             vertex_buffer,
             index_buffer,
@@ -59,27 +59,28 @@ pub fn triangle(renderer: &Renderer, instances: Vec<Instance>) -> Object {
     }
 }
 
-pub fn quad(renderer: &Renderer, instances: Vec<Instance>) -> Object {
+pub fn quad<T>(renderer: &Renderer, instances: Vec<T>) -> Object<T>
+where
+    T: bytemuck::Pod,
+{
     let vertices = vec![
         VertexRaw {
-            position: [-1.0, -1.0, 0.0],
-            uv: [0.0, 0.0],
+            position: Vec3::new(-1.0, -1.0, 0.0),
+            uv: Vec2::new(0.0, 0.0),
         },
         VertexRaw {
-            position: [1.0, 1.0, 0.0],
-            uv: [1.0, 1.0],
+            position: Vec3::new(1.0, 1.0, 0.0),
+            uv: Vec2::new(1.0, 1.0),
         },
         VertexRaw {
-            position: [1.0, -1.0, 0.0],
-            uv: [1.0, 0.0],
+            position: Vec3::new(1.0, -1.0, 0.0),
+            uv: Vec2::new(1.0, 0.0),
         },
         VertexRaw {
-            position: [-1.0, 1.0, 0.0],
-            uv: [0.0, 1.0],
+            position: Vec3::new(-1.0, 1.0, 0.0),
+            uv: Vec2::new(0.0, 1.0),
         },
     ];
-
-    let instance_data: Vec<InstanceRaw> = instances.iter().map(|e| e.to_raw()).collect();
 
     let indices = vec![0, 2, 1, 0, 1, 3];
 
@@ -101,7 +102,7 @@ pub fn quad(renderer: &Renderer, instances: Vec<Instance>) -> Object {
         .device
         .create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Instance Buffer"),
-            contents: bytemuck::cast_slice(&instance_data),
+            contents: bytemuck::cast_slice(&instances),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -109,7 +110,6 @@ pub fn quad(renderer: &Renderer, instances: Vec<Instance>) -> Object {
         vertices,
         indices,
         instances,
-        instance_data,
         render_data: Some(super::ObjectRenderData {
             vertex_buffer,
             index_buffer,

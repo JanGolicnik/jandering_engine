@@ -22,7 +22,15 @@ use winit::platform::web::WindowExtWebSys;
 impl Engine {
     pub fn new(desc: EngineDescriptor) -> Self {
         let event_loop = EventLoop::new();
-        let window = WindowBuilder::new().build(&event_loop).unwrap();
+        cfg_if::cfg_if! {
+            if #[cfg(target_arch = "wasm32")] {
+                use winit::platform::web::WindowBuilderExtWebSys;
+                let window_builder = WindowBuilder::new().with_prevent_default(true);
+            } else {
+                let window_builder = WindowBuilder::new();
+            }
+        }
+        let window = window_builder.build(&event_loop).unwrap();
         window.set_inner_size(PhysicalSize::new(desc.resolution.0, desc.resolution.1));
         #[cfg(target_arch = "wasm32")]
         {
@@ -88,16 +96,17 @@ impl Engine {
                 let dt = (time - last_time).as_secs_f64();
                 last_time = time;
 
-                let (mut encoder, mut surface) =
+                let (mut encoder, view, surface) =
                     renderer.begin_frame().expect("could not begin frame");
 
                 let mut context = EngineContext {
                     encoder: &mut encoder,
-                    surface: &mut surface,
                     control_flow,
+                    surface_view: view,
                     dt,
                     events: &events,
                     window: &window,
+                    resolution: (renderer.config.width, renderer.config.height),
                 };
 
                 update_function(&mut context, &mut renderer);

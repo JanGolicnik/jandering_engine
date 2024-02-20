@@ -1,4 +1,4 @@
-use jandering_engine::camera::{FreeCameraController, PerspectiveCameraData};
+use jandering_engine::bind_group::camera::free::{FreeCameraController, PerspectiveCameraData};
 
 mod definition;
 

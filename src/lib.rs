@@ -4,8 +4,12 @@ pub mod renderer;
 
 pub mod object;
 
-pub mod camera;
-
-pub mod plugins;
+pub mod bind_group;
 
 pub mod shader;
+
+pub mod types;
+
+pub mod texture;
+
+pub mod utils;

@@ -1,27 +1,24 @@
 use wgpu::util::DeviceExt;
 
-use crate::plugins::Plugin;
+use crate::{bind_group::BindGroup, renderer::Renderer};
+
+use super::{BindGroupRenderData, BindGroupWriteData};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-struct ResolutionPluginUniform {
-    resolution: [f32; 2],
+pub struct TimeBindGroupUniform {
+    dt: f32,
+    pub time: f32,
     #[cfg(target_arch = "wasm32")]
     padding: [f32; 2],
 }
 
-struct ResolutionPluginRenderData {
-    buffer: wgpu::Buffer,
-    bind_group_layout: wgpu::BindGroupLayout,
-    bind_group: wgpu::BindGroup,
+pub struct TimeBindGroup {
+    pub uniform: TimeBindGroupUniform,
+    render_data: BindGroupRenderData,
 }
 
-pub struct ResolutionPlugin {
-    uniform: ResolutionPluginUniform,
-    render_data: ResolutionPluginRenderData,
-}
-
-impl Plugin for ResolutionPlugin {
+impl BindGroup for TimeBindGroup {
     fn get_bind_group_layout(&self) -> Option<&wgpu::BindGroupLayout> {
         Some(&self.render_data.bind_group_layout)
     }
@@ -30,15 +27,8 @@ impl Plugin for ResolutionPlugin {
         Some(&self.render_data.bind_group)
     }
 
-    fn update(
-        &mut self,
-        _context: &mut crate::engine::EngineContext,
-        renderer: &mut crate::renderer::Renderer,
-    ) {
-        self.uniform.resolution[0] = renderer.config.width as f32;
-        self.uniform.resolution[1] = renderer.config.height as f32;
-
-        renderer.queue.write_buffer(
+    fn write(&mut self, data: &BindGroupWriteData) {
+        data.queue.write_buffer(
             &self.render_data.buffer,
             0,
             bytemuck::cast_slice(&[self.uniform]),
@@ -46,10 +36,11 @@ impl Plugin for ResolutionPlugin {
     }
 }
 
-impl ResolutionPlugin {
-    pub fn new(renderer: &crate::renderer::Renderer) -> Self {
-        let uniform = ResolutionPluginUniform {
-            resolution: [renderer.config.width as f32, renderer.config.height as f32],
+impl TimeBindGroup {
+    pub fn new(renderer: &Renderer) -> Self {
+        let uniform = TimeBindGroupUniform {
+            dt: 0.0,
+            time: 0.0,
             #[cfg(target_arch = "wasm32")]
             padding: [0.0; 2],
         };
@@ -57,7 +48,7 @@ impl ResolutionPlugin {
         let buffer = renderer
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Resolution Buffer"),
+                label: Some("Time Buffer"),
                 contents: bytemuck::cast_slice(&[uniform]),
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             });
@@ -76,7 +67,7 @@ impl ResolutionPlugin {
                         },
                         count: None,
                     }],
-                    label: Some("resolution_bind_group_layout"),
+                    label: Some("time_bind_group_layout"),
                 });
 
         let bind_group = renderer
@@ -87,16 +78,21 @@ impl ResolutionPlugin {
                     binding: 0,
                     resource: buffer.as_entire_binding(),
                 }],
-                label: Some("resolution_bind_group"),
+                label: Some("time_bind_group"),
             });
 
         Self {
             uniform,
-            render_data: ResolutionPluginRenderData {
+            render_data: BindGroupRenderData {
                 buffer,
                 bind_group_layout,
                 bind_group,
             },
         }
+    }
+
+    pub fn update(&mut self, dt: f32) {
+        self.uniform.time += dt;
+        self.uniform.dt = dt;
     }
 }

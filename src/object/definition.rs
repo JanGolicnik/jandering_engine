@@ -1,8 +1,10 @@
-use crate::{object::VertexRaw, renderer::Renderer};
-use cgmath::{EuclideanSpace, SquareMatrix};
-use wgpu::util::DeviceExt;
+use std::any::Any;
+use std::ops::Range;
 
-use super::{Instance, InstanceRaw, Object, ObjectRenderData, Renderable};
+use super::{D2Instance, Instance, Object, Renderable, Vec2};
+use crate::types::Mat4;
+use crate::{engine::EngineContext, object::VertexRaw, renderer::Renderer};
+use cgmath::{SquareMatrix, Zero};
 
 impl VertexRaw {
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
@@ -30,50 +32,17 @@ impl VertexRaw {
 impl Default for Instance {
     fn default() -> Self {
         Self {
-            scale: None,
-            position: None,
-            rotation: None,
-            changed: true,
+            model: Mat4::identity(),
         }
     }
 }
 
 impl Instance {
-    pub fn to_raw(&self) -> InstanceRaw {
-        let mut model = cgmath::Matrix4::<f32>::identity();
-
-        if let Some(scale) = self.scale {
-            model = cgmath::Matrix4::from_nonuniform_scale(scale.x, scale.y, scale.z) * model;
-        }
-
-        if let Some(rotation) = self.rotation {
-            model = cgmath::Matrix4::from(rotation) * model;
-        }
-
-        if let Some(position) = self.position {
-            model = cgmath::Matrix4::from_translation(position.to_vec()) * model;
-        }
-
-        InstanceRaw {
-            model: model.into(),
-        }
-    }
-}
-
-impl Default for InstanceRaw {
-    fn default() -> Self {
-        Self {
-            model: cgmath::Matrix4::identity().into(),
-        }
-    }
-}
-
-impl InstanceRaw {
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
         use std::mem;
 
         wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<InstanceRaw>() as wgpu::BufferAddress,
+            array_stride: mem::size_of::<Instance>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Instance,
             attributes: &[
                 wgpu::VertexAttribute {
@@ -101,49 +70,56 @@ impl InstanceRaw {
     }
 }
 
-impl Object {
-    pub fn new(renderer: &Renderer) -> Self {
-        let vertex_buffer = renderer
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Vertex Buffer"),
-                contents: &[],
-                usage: wgpu::BufferUsages::VERTEX,
-            });
-        let index_buffer = renderer
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Index Buffer"),
-                contents: &[],
-                usage: wgpu::BufferUsages::INDEX,
-            });
-        let instance_buffer =
-            renderer
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Instance Buffer"),
-                    contents: &[],
-                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                });
+impl Default for D2Instance {
+    fn default() -> Self {
         Self {
-            vertices: Vec::new(),
-            indices: Vec::new(),
-            instances: Vec::new(),
-            instance_data: Vec::new(),
-            render_data: Some(ObjectRenderData {
-                vertex_buffer,
-                index_buffer,
-                instance_buffer,
-            }),
+            position: Vec2::zero(),
+            scale: Vec2::zero(),
+            rotation: 0.0,
         }
-    }
-    pub fn update(&mut self) {
-        self.instance_data = self.instances.iter().map(|e| e.to_raw()).collect();
     }
 }
 
-impl Renderable for Object {
-    fn bind<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, _queue: &mut wgpu::Queue) {
+impl D2Instance {
+    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
+        use std::mem;
+
+        wgpu::VertexBufferLayout {
+            array_stride: mem::size_of::<D2Instance>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 5,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
+                    shader_location: 6,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    shader_location: 7,
+                    format: wgpu::VertexFormat::Float32,
+                },
+            ],
+        }
+    }
+}
+
+impl<T: bytemuck::Pod> Object<T> {
+    pub fn update(&mut self, _context: &EngineContext, renderer: &Renderer) {
+        renderer.queue.write_buffer(
+            &self.render_data.as_ref().unwrap().instance_buffer,
+            0,
+            bytemuck::cast_slice(&self.instances),
+        );
+    }
+}
+
+impl<T: Any> Renderable for Object<T> {
+    fn bind<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, range: Range<u32>) {
         if self.render_data.is_none() {
             return;
         }
@@ -157,10 +133,10 @@ impl Renderable for Object {
             wgpu::IndexFormat::Uint32,
         );
 
-        render_pass.draw_indexed(
-            0..self.indices.len() as u32,
-            0,
-            0..self.instances.len() as u32,
-        );
+        render_pass.draw_indexed(0..self.indices.len() as u32, 0, range);
+    }
+
+    fn num_instances(&self) -> u32 {
+        self.instances.len() as u32
     }
 }

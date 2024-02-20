@@ -1,18 +1,18 @@
 use cgmath::{InnerSpace, SquareMatrix};
 use jandering_engine::{
-    camera::{
+    bind_group::camera::free::{
         constants::{CAMERA_UP, OPENGL_TO_WGPU_MATRIX},
         FreeCameraController, PerspectiveCameraData,
     },
+    bind_group::BindGroup,
     engine::EngineContext,
-    plugins::Plugin,
     renderer::Renderer,
 };
 use wgpu::{util::DeviceExt, BindGroupLayout};
 
 use super::{CustomCameraPlugin, CustomCameraRenderData, CustomCameraUniform};
 
-impl Plugin for CustomCameraPlugin {
+impl BindGroup for CustomCameraPlugin {
     fn get_bind_group_layout(&self) -> Option<&BindGroupLayout> {
         Some(&self.render_data.bind_group_layout)
     }

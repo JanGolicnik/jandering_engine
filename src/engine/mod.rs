@@ -10,11 +10,12 @@ pub struct Engine {
 
 pub struct EngineContext<'a> {
     pub encoder: &'a mut wgpu::CommandEncoder,
-    pub surface: &'a mut wgpu::SurfaceTexture,
     pub control_flow: &'a mut winit::event_loop::ControlFlow,
+    pub surface_view: wgpu::TextureView,
     pub dt: f64,
     pub events: &'a [winit::event::WindowEvent<'a>],
     pub window: &'a winit::window::Window,
+    pub resolution: (u32, u32),
 }
 
 pub struct EngineDescriptor {
