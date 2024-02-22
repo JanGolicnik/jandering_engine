@@ -18,6 +18,7 @@ web-sys = { version = "0.3", features = [
     "Window",
     "Element",
     "Location",
+    "HtmlAudioElement",
 ]}
 reqwest = { version = "0.11" }
 log = "0.4.20"

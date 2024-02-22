@@ -5,6 +5,7 @@ use super::{
     map::{tiles::GROUND, Map},
     player::Player,
     post_processing::PostProcessing,
+    ui::UserInterface,
     GameState,
 };
 use jandering_engine::{
@@ -40,8 +41,8 @@ impl Game {
         .await;
 
         let player = Player::new(&mut engine.renderer, camera_bg).await;
-
         let post_processing = PostProcessing::new(&mut engine.renderer, resolution_bg).await;
+        let ui = UserInterface::new(&mut engine.renderer, camera_bg, resolution_bg).await;
 
         Self {
             engine,
@@ -49,7 +50,8 @@ impl Game {
             map,
             camera_bg,
             post_processing,
-            state: super::GameState::MainMenu,
+            state: super::GameState::Init,
+            ui,
         }
     }
 
@@ -61,14 +63,27 @@ impl Game {
             mut state,
             mut post_processing,
             camera_bg,
+            mut ui,
             ..
         } = self;
 
-        let mut world_mouse_pos: Option<cgmath::Vector2<f32>> = None;
+        #[allow(unused_assignments)]
+        let mut world_mouse_pos: Option<Vec2> = None;
         #[allow(unused_assignments)]
         let mut resolution = Vec2::new(0.0, 0.0);
 
+        let mut time = 0.0;
+
+        let mut paused = false;
+
         engine.run(move |context, renderer: &mut Renderer| {
+            time += context.dt as f32;
+            if time > 1.0 {
+                time = 0.0;
+                let result = web_sys::HtmlAudioElement::new_with_src("res/MJ.mp3");
+                let _ = result.unwrap().play();
+            }
+
             let popr_target_texture = post_processing.get_texture_handle();
             renderer.set_render_target(popr_target_texture);
             renderer.clear_texture(
@@ -90,11 +105,7 @@ impl Game {
                         position.x as f32,
                         renderer.config.height as f32 - position.y as f32,
                     );
-                    screen_pos.x /= resolution.x;
-                    screen_pos.y /= resolution.y;
-                    screen_pos -= Vec2::new(0.5, 0.5);
-                    screen_pos.x *= resolution.x;
-                    screen_pos.y *= resolution.y;
+                    screen_pos -= Vec2::new(resolution.x * 0.5, resolution.y * 0.5);
                     world_mouse_pos = Some(
                         screen_pos - renderer.get_bind_group_t(camera_bg).unwrap().data.position,
                     );
@@ -103,25 +114,55 @@ impl Game {
 
             loop {
                 let prev_state = state;
+                if let Some(action) =
+                    ui.update(context, renderer, world_mouse_pos, context.dt as f32)
+                {
+                    match action {
+                        super::ui::UIAction::Play => {
+                            ui.show_playing();
+                            paused = false;
+                            state = GameState::SetupPlaying
+                        }
+                        super::ui::UIAction::Create => {
+                            ui.show_creating();
+                            state = GameState::Creating
+                        }
+                        super::ui::UIAction::Exit => {
+                            ui.show_mainmenu();
+                            state = GameState::MainMenu
+                        }
+                        super::ui::UIAction::Pause => {
+                            ui.show_paused();
+                            paused = true;
+                        }
+                        super::ui::UIAction::Resume => {
+                            ui.show_playing();
+                            paused = false;
+                        }
+                    }
+                }
+
                 match state {
                     GameState::MainMenu => {
-                        Self::update_mainmenu(context, &mut state, renderer, &mut map)
+                        Self::update_mainmenu(context, renderer, &mut map, &mut ui)
                     }
                     GameState::SetupPlaying => {
-                        Self::update_setupplaying(&mut player, &mut map, &mut state)
+                        Self::update_setupplaying(&mut player, &mut map);
+                        state = GameState::Playing;
                     }
                     GameState::Playing => {
-                        Self::update_playing(context, renderer, &mut player, &mut map, &mut state)
+                        Self::update_playing(context, renderer, &mut player, &mut map, paused)
                     }
-
-                    GameState::Creating => Self::update_creating(
-                        context,
-                        &mut state,
-                        renderer,
-                        &mut map,
-                        &world_mouse_pos,
-                    ),
+                    GameState::Creating => {
+                        Self::update_creating(context, renderer, &mut map, &world_mouse_pos)
+                    }
+                    GameState::Init => {
+                        ui.show_mainmenu();
+                        state = GameState::MainMenu
+                    }
                 }
+
+                ui.render(context, renderer);
                 if prev_state == state {
                     break;
                 }
@@ -133,11 +174,10 @@ impl Game {
         });
     }
 
-    fn update_setupplaying(player: &mut Player, map: &mut Map, state: &mut GameState) {
+    fn update_setupplaying(player: &mut Player, map: &mut Map) {
         player.reset(Vec2::new(0.0, TILE_SIZE * 2.0));
         map.position.x = 0.0;
         map.hue = 0.0;
-        *state = GameState::Playing;
     }
 
     fn update_playing(
@@ -145,39 +185,26 @@ impl Game {
         renderer: &mut Renderer,
         player: &mut Player,
         map: &mut Map,
-        state: &mut GameState,
+        paused: bool,
     ) {
-        for event in context.events.iter() {
-            if let WindowEvent::KeyboardInput {
-                input:
-                    KeyboardInput {
-                        virtual_keycode: Some(VirtualKeyCode::Escape),
-                        ..
-                    },
-                ..
-            } = event
-            {
-                *state = GameState::MainMenu;
-                return;
+        if !paused {
+            if !player.is_alive() {
+                player.reset(Vec2::new(0.0, TILE_SIZE * 2.0));
+                map.position.x = 0.0;
             }
-        }
+            if player.is_alive() {
+                player.update(context, map);
+            }
 
-        if !player.is_alive() {
-            player.reset(Vec2::new(0.0, TILE_SIZE * 2.0));
-            map.position.x = 0.0;
-        }
-        if player.is_alive() {
-            player.update(context, map);
-        }
+            let speed = context.dt as f32 * 5.0 * TILE_SIZE;
+            if player.position.x < 6.0 * TILE_SIZE {
+                player.position.x += speed;
+            } else {
+                map.position.x -= speed;
+            }
 
-        let speed = context.dt as f32 * 5.0 * TILE_SIZE;
-        if player.position.x < 6.0 * TILE_SIZE {
-            player.position.x += speed;
-        } else {
-            map.position.x -= speed;
+            player.hue = map.hue + 0.5;
         }
-
-        player.hue = map.hue + 0.5;
 
         map.render(context, renderer);
         player.render(context, renderer);
@@ -185,39 +212,17 @@ impl Game {
 
     fn update_mainmenu(
         context: &mut EngineContext,
-        state: &mut GameState,
         renderer: &mut Renderer,
         map: &mut Map,
+        ui: &mut UserInterface,
     ) {
-        for event in context.events.iter() {
-            if let WindowEvent::KeyboardInput {
-                input:
-                    KeyboardInput {
-                        virtual_keycode: Some(key),
-                        state: ElementState::Pressed,
-                        ..
-                    },
-                ..
-            } = event
-            {
-                match key {
-                    VirtualKeyCode::Space => {
-                        *state = GameState::SetupPlaying;
-                    }
-                    VirtualKeyCode::C => {
-                        *state = GameState::Creating;
-                    }
-                    _ => {}
-                }
-            }
-        }
         map.position.x = 0.0;
         map.render(context, renderer);
+        ui.render(context, renderer);
     }
 
     fn update_creating(
         context: &mut EngineContext,
-        state: &mut GameState,
         renderer: &mut Renderer,
         map: &mut Map,
         mouse_pos: &Option<Vec2>,
@@ -233,12 +238,6 @@ impl Game {
                         },
                     ..
                 } => match keycode {
-                    VirtualKeyCode::Escape => {
-                        *state = GameState::MainMenu;
-                    }
-                    VirtualKeyCode::Space => {
-                        *state = GameState::SetupPlaying;
-                    }
                     VirtualKeyCode::D => {
                         map.position.x -= TILE_SIZE;
                     }

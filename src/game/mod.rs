@@ -6,15 +6,19 @@ use player::Player;
 
 use post_processing::PostProcessing;
 
+use self::ui::UserInterface;
+
 pub mod constants;
 pub mod definition;
 pub mod hue_plugin;
 pub mod map;
 pub mod player;
 pub mod post_processing;
+pub mod ui;
 
 #[derive(PartialEq, Eq, Copy, Clone)]
 enum GameState {
+    Init,
     MainMenu,
     SetupPlaying,
     Playing,
@@ -28,4 +32,5 @@ pub struct Game {
     post_processing: PostProcessing,
     camera_bg: BindGroupHandle<D2CameraBindGroup>,
     state: GameState,
+    ui: UserInterface,
 }
