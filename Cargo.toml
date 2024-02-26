@@ -21,8 +21,9 @@ web-sys = { version = "0.3", features = [
 ]}
 reqwest = { version = "0.11" }
 log = "0.4.20"
-winit = "0.29.10"
-cgmath = "0.18.0"
+winit = "0.28"
+cgmath = { git = "https://github.com/rustgd/cgmath.git", version = "0.18.0", features = ["bytemuck"] }
+bytemuck = { version = "1.14", features = ["derive"] }
 
 [dependencies.jandering_engine]
 path = "../jandering_engine"
