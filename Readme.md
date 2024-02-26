@@ -1,9 +1,7 @@
-# wasm example template
+# Nodes 
 
-Best place to start if you want to use wasm
+just wanted to do it cuz it seemed satisfying you know
 
-## How to run
+build with wasm-pack build --target web
 
-Make sure you have jandering engine where Cargo.toml can pick it up!
-
-    wasm-pack build --target web
+left click to create nodes, also to drag them around, right click to pan, middle click to connect, 
