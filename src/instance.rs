@@ -1,4 +1,3 @@
-use cgmath::Zero;
 use jandering_engine::types::{Vec2, Vec3};
 
 #[repr(C)]
@@ -13,10 +12,10 @@ pub struct D2ColorInstance {
 impl Default for D2ColorInstance {
     fn default() -> Self {
         Self {
-            position: Vec2::zero(),
-            scale: Vec2::zero(),
+            position: Vec2::ZERO,
+            scale: Vec2::ZERO,
             rotation: 0.0,
-            color: Vec3::zero(),
+            color: Vec3::ZERO,
         }
     }
 }

@@ -3,10 +3,6 @@ struct Camera {
     resolution: vec2<f32>
 };
 
-struct Resolution {
-    res: vec2<f32>,
-};
-
 @group(0) @binding(0)
 var<uniform> camera: Camera;
 
