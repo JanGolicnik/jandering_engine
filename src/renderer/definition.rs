@@ -8,6 +8,7 @@ use crate::{
     object::{self, Renderable},
     shader::Shader,
     texture::Texture,
+    types::Vec3,
 };
 
 use super::{BindGroupHandle, Renderer, TextureHandle, UntypedBindGroupHandle};
@@ -84,6 +85,7 @@ impl Renderer {
 
     pub fn begin_frame(
         &mut self,
+        clear_color: Vec3,
     ) -> Result<
         (
             wgpu::CommandEncoder,
@@ -116,9 +118,9 @@ impl Renderer {
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: 0.015,
-                        g: 0.007,
-                        b: 0.045,
+                        r: clear_color.x as f64,
+                        g: clear_color.y as f64,
+                        b: clear_color.z as f64,
                         a: 1.0,
                     }),
                     store: wgpu::StoreOp::Store,

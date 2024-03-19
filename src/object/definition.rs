@@ -4,7 +4,7 @@ use std::ops::Range;
 use super::{D2Instance, Instance, Object, Renderable, Vec2};
 use crate::types::Mat4;
 use crate::{engine::EngineContext, object::VertexRaw, renderer::Renderer};
-use cgmath::{SquareMatrix, Zero};
+use wgpu::util::DeviceExt;
 
 impl VertexRaw {
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
@@ -32,7 +32,7 @@ impl VertexRaw {
 impl Default for Instance {
     fn default() -> Self {
         Self {
-            model: Mat4::identity(),
+            model: Mat4::IDENTITY,
         }
     }
 }
@@ -73,8 +73,8 @@ impl Instance {
 impl Default for D2Instance {
     fn default() -> Self {
         Self {
-            position: Vec2::zero(),
-            scale: Vec2::zero(),
+            position: Vec2::ZERO,
+            scale: Vec2::ZERO,
             rotation: 0.0,
         }
     }
@@ -110,11 +110,22 @@ impl D2Instance {
 
 impl<T: bytemuck::Pod> Object<T> {
     pub fn update(&mut self, _context: &EngineContext, renderer: &Renderer) {
-        renderer.queue.write_buffer(
-            &self.render_data.as_ref().unwrap().instance_buffer,
-            0,
-            bytemuck::cast_slice(&self.instances),
-        );
+        if self.previous_instances_len != self.instances.len() {
+            self.render_data.as_mut().unwrap().instance_buffer = renderer
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Instance Buffer"),
+                    contents: bytemuck::cast_slice(&self.instances),
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                });
+            self.previous_instances_len = self.instances.len();
+        } else {
+            renderer.queue.write_buffer(
+                &self.render_data.as_ref().unwrap().instance_buffer,
+                0,
+                bytemuck::cast_slice(&self.instances),
+            );
+        }
     }
 }
 
@@ -137,6 +148,6 @@ impl<T: Any> Renderable for Object<T> {
     }
 
     fn num_instances(&self) -> u32 {
-        self.instances.len() as u32
+        self.previous_instances_len as u32
     }
 }

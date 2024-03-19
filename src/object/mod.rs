@@ -20,7 +20,7 @@ pub struct Instance {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct D2Instance {
     pub position: Vec2,
     pub scale: Vec2,
@@ -43,6 +43,8 @@ pub struct Object<T> {
     pub instances: Vec<T>,
     //
     pub render_data: Option<ObjectRenderData>,
+
+    previous_instances_len: usize,
 }
 
 pub trait Renderable {

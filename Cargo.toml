@@ -2,8 +2,12 @@
 name = "jandering_engine"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["Jan Goličnik <jan@nejka.net>"]
+description = "Bare bones rendering framework"
+keywords = ["rendering"]
+license = "MPL-2.0"
+repository = "https://github.com/JanGolicnik/jandering_engine"
+rust-version = "1.65"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -11,7 +15,6 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 bytemuck = { version = "1.14", features = ["derive"] }
 env_logger = "0.10"
-cgmath = { git = "https://github.com/rustgd/cgmath.git", version = "0.18.0", features = ["bytemuck"] }
 log = "0.4"
 pollster = "0.3.0"
 wgpu = "0.18"
@@ -21,6 +24,7 @@ web-time = "1.0.0"
 image = {version = "0.24.8", features = ["png", "jpeg"], default-features = false}
 reqwest = "0.11.24"
 anyhow = "1.0.79"
+glam = {version = "0.25.0", features = ["bytemuck"]}
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wgpu = {verison = "0.18", features = ["webgl"]}

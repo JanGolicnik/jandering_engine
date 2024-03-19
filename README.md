@@ -25,3 +25,7 @@ I want to include things that may not necerssarily fall under a rendering engine
 - [ ] skybox
 - [x] wasm support (check out wasm branch)
 - [x] textures
+
+## License
+
+Published under the MPL 2.0 license.

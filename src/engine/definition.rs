@@ -5,7 +5,7 @@ use winit::{
     window::{WindowBuilder, WindowId},
 };
 
-use crate::renderer::Renderer;
+use crate::{renderer::Renderer, types::Vec3};
 
 use super::{Engine, EngineContext, EngineDescriptor};
 
@@ -32,6 +32,7 @@ impl Engine {
         }
         let window = window_builder.build(&event_loop).unwrap();
         window.set_inner_size(PhysicalSize::new(desc.resolution.0, desc.resolution.1));
+        window.set_cursor_visible(desc.show_cursor);
         #[cfg(target_arch = "wasm32")]
         {
             web_sys::window()
@@ -50,6 +51,7 @@ impl Engine {
             window,
             event_loop,
             renderer,
+            clear_color: desc.clear_color,
         }
     }
     pub fn window_id(&self) -> WindowId {
@@ -64,6 +66,7 @@ impl Engine {
             event_loop,
             window,
             mut renderer,
+            clear_color,
             ..
         } = self;
 
@@ -96,10 +99,11 @@ impl Engine {
                 let dt = (time - last_time).as_secs_f64();
                 last_time = time;
 
-                let (mut encoder, view, surface) =
-                    renderer.begin_frame().expect("could not begin frame");
+                let (mut encoder, view, surface) = renderer
+                    .begin_frame(clear_color)
+                    .expect("could not begin frame");
 
-                let mut context = EngineContext {
+                let mut context: EngineContext<'_> = EngineContext {
                     encoder: &mut encoder,
                     control_flow,
                     surface_view: view,
@@ -132,6 +136,8 @@ impl Default for EngineDescriptor {
     fn default() -> Self {
         Self {
             resolution: (800, 800),
+            clear_color: Vec3::new(0.015, 0.007, 0.045),
+            show_cursor: true,
         }
     }
 }

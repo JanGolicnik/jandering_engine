@@ -13,6 +13,7 @@ pub struct ShaderDescriptor<'a> {
     pub targets: Option<&'a [Option<wgpu::ColorTargetState>]>,
     pub vs_entry: &'a str,
     pub fs_entry: &'a str,
+    pub backface_culling: bool,
 }
 
 impl<'a> Default for ShaderDescriptor<'a> {
@@ -24,6 +25,16 @@ impl<'a> Default for ShaderDescriptor<'a> {
             targets: None,
             vs_entry: "vs_main",
             fs_entry: "fs_main",
+            backface_culling: true,
+        }
+    }
+}
+
+impl<'a> ShaderDescriptor<'a> {
+    pub fn default_flat() -> Self {
+        Self {
+            code: include_str!("flat_shader.wgsl"),
+            ..Default::default()
         }
     }
 }
@@ -54,14 +65,7 @@ pub fn create_shader(renderer: &mut Renderer, desc: ShaderDescriptor) -> Shader 
 
     let default_targets = [Some(wgpu::ColorTargetState {
         format: renderer.config.format,
-        blend: Some(wgpu::BlendState {
-            alpha: wgpu::BlendComponent::OVER,
-            color: wgpu::BlendComponent {
-                src_factor: wgpu::BlendFactor::SrcAlpha,
-                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                operation: wgpu::BlendOperation::Add,
-            },
-        }),
+        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
         write_mask: wgpu::ColorWrites::ALL,
     })];
 
@@ -91,8 +95,11 @@ pub fn create_shader(renderer: &mut Renderer, desc: ShaderDescriptor) -> Shader 
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 strip_index_format: None,
                 front_face: wgpu::FrontFace::Ccw,
-                // cull_mode: None,
-                cull_mode: Some(wgpu::Face::Back),
+                cull_mode: if desc.backface_culling {
+                    Some(wgpu::Face::Back)
+                } else {
+                    None
+                },
                 polygon_mode: wgpu::PolygonMode::Fill,
                 unclipped_depth: false,
                 conservative: false,

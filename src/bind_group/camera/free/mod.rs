@@ -1,5 +1,5 @@
 use super::CameraUniform;
-use crate::bind_group::BindGroupRenderData;
+use crate::{bind_group::BindGroupRenderData, types::Vec3};
 
 pub mod constants;
 mod definition;
@@ -11,15 +11,15 @@ pub struct FreeCameraController {
     pub backward_pressed: bool,
     pub is_shift_pressed: bool,
     pub speed_multiplier: f32,
-    pub velocity: cgmath::Vector3<f32>,
+    pub velocity: Vec3,
 
     pub yaw: f32,
     pub pitch: f32,
 }
 
 pub struct PerspectiveCameraData {
-    pub position: cgmath::Point3<f32>,
-    pub direction: cgmath::Vector3<f32>,
+    pub position: Vec3,
+    pub direction: Vec3,
     //
     pub fov: f32,
     pub znear: f32,

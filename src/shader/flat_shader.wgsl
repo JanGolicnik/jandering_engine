@@ -3,19 +3,12 @@ struct Camera {
     resolution: vec2<f32>
 };
 
-struct Resolution {
-    res: vec2<f32>,
-};
-
 @group(0) @binding(0)
 var<uniform> camera: Camera;
 
 @group(1) @binding(0)
-var<uniform> resolution: Resolution;
-
-@group(2) @binding(0)
 var tex: texture_2d<f32>;
-@group(2) @binding(1)
+@group(1) @binding(1)
 var tex_sampler: sampler;
 
 struct InstanceInput{
@@ -40,13 +33,14 @@ fn vs_main(
     instance: InstanceInput
 ) -> VertexOutput{
 
-    var p = model.position.xy;
+    var vertex_pos = model.position.xy;
+    vertex_pos *= instance.scale * 0.5;
+    
     let sin_a = sin(instance.rotation);
     let cos_a = cos(instance.rotation);
-    let rotated_vert_position = vec2<f32>(p.x * cos_a - p.y * sin_a, p.x * sin_a + p.y * cos_a);
+    vertex_pos = vec2<f32>(vertex_pos.x * cos_a - vertex_pos.y * sin_a, vertex_pos.x * sin_a + vertex_pos.y * cos_a);
 
-    var position = camera.position + round(instance.position + rotated_vert_position * instance.scale);
-    position /= camera.resolution;
+    var position = (camera.position + round(instance.position + vertex_pos)) / (camera.resolution * 0.5);
 
     var out: VertexOutput;
     out.clip_position = vec4<f32>(position, 0.0, 1.0);

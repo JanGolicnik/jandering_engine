@@ -1,4 +1,4 @@
-use crate::renderer::Renderer;
+use crate::{renderer::Renderer, types::Vec3};
 
 mod definition;
 
@@ -6,6 +6,7 @@ pub struct Engine {
     pub window: winit::window::Window,
     event_loop: winit::event_loop::EventLoop<()>,
     pub renderer: Renderer,
+    pub clear_color: Vec3,
 }
 
 pub struct EngineContext<'a> {
@@ -20,4 +21,6 @@ pub struct EngineContext<'a> {
 
 pub struct EngineDescriptor {
     pub resolution: (u32, u32),
+    pub clear_color: Vec3,
+    pub show_cursor: bool,
 }

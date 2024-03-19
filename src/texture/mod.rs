@@ -101,7 +101,7 @@ impl Texture {
             address_mode_v: desc.address_mode,
             address_mode_w: desc.address_mode,
             mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Linear,
             mipmap_filter: wgpu::FilterMode::Nearest,
             ..Default::default()
         });

@@ -17,19 +17,15 @@ pub struct D2CameraController {
     pub is_mouse_pressed: bool,
     pub is_shift_pressed: bool,
     pub zoom: f32,
-    pub velocity: cgmath::Vector2<f32>,
-    pub pan_offset: cgmath::Vector2<f32>,
-}
-
-pub struct D2CameraData {
-    pub position: Vec2,
-    pub resolution: Vec2,
+    pub velocity: Vec2,
+    pub pan_offset: Vec2,
 }
 
 pub struct D2CameraBindGroup {
-    pub data: D2CameraData,
+    pub position: Vec2,
+    pub resolution: Vec2,
     //
-    controller: Option<D2CameraController>,
+    pub controller: Option<D2CameraController>,
     //
     uniform: FlatCameraUniform,
     render_data: BindGroupRenderData,
@@ -37,4 +33,5 @@ pub struct D2CameraBindGroup {
     last_mouse_position: Option<(f32, f32)>,
     pressing: bool,
     mouse_is_inside: bool,
+    pub right_click_move: bool,
 }

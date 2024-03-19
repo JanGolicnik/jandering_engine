@@ -1,4 +1,3 @@
-use cgmath::Zero;
 use wgpu::{util::DeviceExt, BindGroupLayout};
 use winit::event::MouseButton;
 #[allow(unused_imports)]
@@ -8,7 +7,7 @@ use winit::{
     window::Window,
 };
 
-use super::{BindGroupRenderData, D2CameraData};
+use super::BindGroupRenderData;
 use super::{D2CameraBindGroup, D2CameraController};
 use crate::{
     bind_group::{BindGroup, BindGroupWriteData},
@@ -27,14 +26,6 @@ impl BindGroup for D2CameraBindGroup {
     }
 
     fn write(&mut self, data: &BindGroupWriteData) {
-        self.resize(PhysicalSize::new(data.config.width, data.config.height));
-
-        self.handle_events(data.context);
-        if let Some(controller) = self.controller.as_mut() {
-            controller.update(&mut self.data.position, data.context.dt);
-        }
-        self.update_uniform();
-
         data.queue.write_buffer(
             &self.render_data.buffer,
             0,
@@ -45,23 +36,17 @@ impl BindGroup for D2CameraBindGroup {
 
 impl D2CameraBindGroup {
     pub fn resize(&mut self, physical_size: PhysicalSize<u32>) {
-        self.data.resolution = Vec2::new(physical_size.width as f32, physical_size.height as f32);
+        self.resolution = Vec2::new(physical_size.width as f32, physical_size.height as f32);
     }
 
     pub fn update_uniform(&mut self) {
-        let D2CameraData {
-            position,
-            resolution,
-            ..
-        } = &self.data;
-
-        self.uniform.view_position = [position.x, position.y];
+        self.uniform.view_position = [-self.position.x, -self.position.y];
         let zoom = if let Some(controller) = self.controller.as_ref() {
             controller.zoom
         } else {
             1.0
         };
-        self.uniform.resolution = [resolution[0] * zoom, resolution[1] * zoom];
+        self.uniform.resolution = [self.resolution[0] * zoom, self.resolution[1] * zoom];
     }
 
     pub fn new(renderer: &crate::renderer::Renderer, with_controller: bool) -> Self {
@@ -113,10 +98,8 @@ impl D2CameraBindGroup {
         };
 
         Self {
-            data: D2CameraData {
-                position: Vec2::zero(),
-                resolution: Vec2::new(renderer.config.width as f32, renderer.config.height as f32),
-            },
+            position: Vec2::ZERO,
+            resolution: Vec2::new(renderer.config.width as f32, renderer.config.height as f32),
             controller,
             uniform,
             render_data: BindGroupRenderData {
@@ -127,6 +110,7 @@ impl D2CameraBindGroup {
             last_mouse_position: None,
             pressing: false,
             mouse_is_inside: true,
+            right_click_move: false,
         }
     }
 
@@ -165,14 +149,49 @@ impl D2CameraBindGroup {
                 WindowEvent::MouseInput {
                     device_id,
                     state,
-                    button: MouseButton::Left,
+                    button,
                     ..
                 } => {
-                    self.pressing = matches!(state, ElementState::Pressed);
+                    if (self.right_click_move && *button == MouseButton::Right)
+                        || (!self.right_click_move && *button == MouseButton::Left)
+                    {
+                        self.pressing = matches!(state, ElementState::Pressed);
+                    }
                 }
                 _ => {}
             }
         }
+    }
+
+    pub fn update(&mut self, context: &EngineContext) {
+        self.resize(PhysicalSize::new(
+            context.resolution.0,
+            context.resolution.1,
+        ));
+
+        self.handle_events(context);
+        if let Some(controller) = self.controller.as_mut() {
+            controller.update(&mut self.position, context.dt);
+        }
+        self.update_uniform();
+    }
+
+    fn resolution(&self) -> Vec2 {
+        let zoom = if let Some(controller) = &self.controller {
+            controller.zoom
+        } else {
+            1.0
+        };
+        self.resolution * zoom
+    }
+
+    pub fn mouse_to_world(&self, mut position: Vec2) -> Vec2 {
+        position.y = self.resolution.y - position.y;
+        let resolution = self.resolution();
+        position.x = (position.x / self.resolution.x) * resolution.x;
+        position.y = (position.y / self.resolution.y) * resolution.y;
+        position += self.position - resolution / 2.0;
+        position
     }
 }
 
@@ -186,8 +205,8 @@ impl Default for D2CameraController {
             is_shift_pressed: false,
             zoom: 1.0,
             is_mouse_pressed: false,
-            velocity: cgmath::Vector2 { x: 0.0, y: 0.0 },
-            pan_offset: cgmath::Vector2 { x: 0.0, y: 0.0 },
+            velocity: Vec2 { x: 0.0, y: 0.0 },
+            pan_offset: Vec2 { x: 0.0, y: 0.0 },
         }
     }
 }
@@ -201,12 +220,14 @@ impl D2CameraController {
     pub fn event(&mut self, event: &WindowEvent) {
         match event {
             WindowEvent::ModifiersChanged(state) => self.is_shift_pressed = state.shift(),
-            WindowEvent::MouseWheel {
-                delta: MouseScrollDelta::LineDelta(_, val),
-                ..
-            } => {
-                self.zoom = (self.zoom - val / 10.0).max(0.2);
-            }
+            WindowEvent::MouseWheel { delta, .. } => match delta {
+                MouseScrollDelta::LineDelta(_, val) => {
+                    self.zoom = (self.zoom - val / 10.0).max(0.2)
+                }
+                MouseScrollDelta::PixelDelta(val) => {
+                    self.zoom = (self.zoom - val.y as f32 / 100.0).max(0.2)
+                }
+            },
 
             WindowEvent::KeyboardInput {
                 input:

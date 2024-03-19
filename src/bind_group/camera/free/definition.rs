@@ -1,4 +1,3 @@
-use cgmath::{Angle, InnerSpace, SquareMatrix};
 use wgpu::{util::DeviceExt, BindGroupLayout};
 #[allow(unused_imports)]
 use winit::{
@@ -15,7 +14,7 @@ use super::{
 use crate::{
     bind_group::{camera::CameraUniform, BindGroup, BindGroupWriteData},
     engine::EngineContext,
-    types::UVec2,
+    types::{Mat4, UVec2, Vec3, RAD_TO_DEG},
 };
 
 #[allow(unused_variables)]
@@ -56,18 +55,18 @@ impl FreeCameraBindGroup {
         } = &self.perspective;
 
         self.uniform.view_proj = {
-            let view = cgmath::Matrix4::look_at_rh(*position, position + direction, CAMERA_UP);
-            let proj = cgmath::perspective(cgmath::Deg(*fov), *aspect, *znear, *zfar);
+            let view = Mat4::look_at_rh(*position, *position + *direction, CAMERA_UP);
+            let proj = Mat4::perspective_rh(*fov, *aspect, *znear, *zfar);
             OPENGL_TO_WGPU_MATRIX * proj * view
         }
-        .into();
-        self.uniform.view_position = position.to_homogeneous().into();
+        .to_cols_array_2d();
+        self.uniform.view_position = [position.x, position.y, position.z, 1.0];
     }
 
     pub fn new(renderer: &crate::renderer::Renderer) -> Self {
         let uniform = CameraUniform {
             view_position: [0.0; 4],
-            view_proj: cgmath::Matrix4::identity().into(),
+            view_proj: Mat4::IDENTITY.to_cols_array_2d(),
         };
 
         let buffer = renderer
@@ -108,12 +107,12 @@ impl FreeCameraBindGroup {
 
         Self {
             perspective: PerspectiveCameraData {
-                position: cgmath::Point3 {
+                position: Vec3 {
                     x: 2.0,
                     y: 2.0,
                     z: 2.0,
                 },
-                direction: cgmath::Vector3 {
+                direction: Vec3 {
                     x: 0.0,
                     y: 0.0,
                     z: -1.0,
@@ -183,7 +182,7 @@ impl Default for FreeCameraController {
             backward_pressed: false,
             is_shift_pressed: false,
             speed_multiplier: 1.0,
-            velocity: cgmath::Vector3 {
+            velocity: Vec3 {
                 x: 0.0,
                 y: 0.0,
                 z: 0.0,
@@ -233,12 +232,7 @@ impl FreeCameraController {
         }
     }
 
-    pub fn update(
-        &mut self,
-        object_position: &mut cgmath::Point3<f32>,
-        object_direction: &mut cgmath::Vector3<f32>,
-        dt: f64,
-    ) {
+    pub fn update(&mut self, object_position: &mut Vec3, object_direction: &mut Vec3, dt: f64) {
         let Self {
             right_pressed,
             left_pressed,
@@ -252,12 +246,12 @@ impl FreeCameraController {
             ..
         } = *self;
 
-        let mut direction = cgmath::Vector3::new(0.0, 0.0, 0.0);
-        let yaw_rad = cgmath::Rad::from(cgmath::Deg(yaw));
-        let pitch_rad = cgmath::Rad::from(cgmath::Deg(pitch));
-        direction.x = cgmath::Rad::cos(yaw_rad) * cgmath::Rad::cos(pitch_rad);
-        direction.y = cgmath::Rad::sin(pitch_rad);
-        direction.z = cgmath::Rad::sin(yaw_rad) * cgmath::Rad::cos(pitch_rad);
+        let mut direction = Vec3::new(0.0, 0.0, 0.0);
+        let yaw_rad = yaw * RAD_TO_DEG;
+        let pitch_rad = pitch * RAD_TO_DEG;
+        direction.x = yaw_rad.cos() * pitch_rad.cos();
+        direction.y = pitch_rad.sin();
+        direction.z = yaw_rad.sin() * pitch_rad.cos();
         *object_direction = direction.normalize();
 
         let speed = CAMERA_SPEED * speed_multiplier * if is_shift_pressed { 2.0 } else { 1.0 };
@@ -275,8 +269,7 @@ impl FreeCameraController {
         }
 
         *object_position += velocity.z * *object_direction * dt as f32;
-        *object_position +=
-            velocity.x * object_direction.cross(cgmath::Vector3::unit_y()) * dt as f32;
+        *object_position += velocity.x * object_direction.cross(Vec3::Y) * dt as f32;
 
         self.velocity += -self.velocity * (dt * 6.0) as f32;
     }
