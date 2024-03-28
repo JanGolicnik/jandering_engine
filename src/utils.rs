@@ -1,5 +1,12 @@
 use std::path::PathBuf;
 
+use crate::{
+    core::{
+        object::{primitives::object, Object, Vertex},
+        renderer::Renderer,
+    },
+    types::{UVec2, Vec2, Vec3},
+};
 pub enum FilePath<'a> {
     FileName(&'a str),
     AbsolutePath(PathBuf),
@@ -61,4 +68,75 @@ pub async fn load_text(file: FilePath<'_>) -> anyhow::Result<String> {
            Ok(std::fs::read_to_string(path)?)
         }
     }
+}
+
+pub fn load_obj_from_text<I: bytemuck::Pod>(
+    data: &str,
+    renderer: &Renderer,
+    instances: Vec<I>,
+) -> Object<I> {
+    let mut positions = Vec::new();
+    let mut normals = Vec::new();
+    let mut uvs = Vec::new();
+    let mut groups: Vec<Vec<u32>> = Vec::new();
+
+    for line in data
+        .lines()
+        .filter(|e| !matches!(e.chars().next(), Some('#') | None))
+    {
+        let seprated = line.split(' ').collect::<Vec<_>>();
+        match seprated.first() {
+            Some(&"v") => {
+                let x = seprated[1].parse::<f32>().unwrap();
+                let y = seprated[2].parse::<f32>().unwrap();
+                let z = seprated[3].parse::<f32>().unwrap();
+                positions.push(Vec3::new(x, y, z));
+            }
+            Some(&"vn") => {
+                let x = seprated[1].parse::<f32>().unwrap();
+                let y = seprated[2].parse::<f32>().unwrap();
+                let z = seprated[3].parse::<f32>().unwrap();
+                normals.push(Vec3::new(x, y, z));
+            }
+            Some(&"vt") => {
+                let x = seprated[1].parse::<f32>().unwrap();
+                let y = seprated[2].parse::<f32>().unwrap();
+                uvs.push(Vec2::new(x, y));
+            }
+            Some(&"f") => {
+                let mut arr: Vec<Vec<u32>> = (1..4)
+                    .map(|i| {
+                        seprated[i]
+                            .split('/')
+                            .map(|e| e.parse::<u32>().unwrap().saturating_sub(1))
+                            .collect::<Vec<_>>()
+                    })
+                    .collect();
+                groups.append(&mut arr);
+            }
+            _ => {}
+        }
+    }
+
+    let mut indices = Vec::new();
+    let mut vertices = Vec::new();
+    let mut mapped_vertices: Vec<(UVec2, u32)> = Vec::new();
+    for group in groups {
+        let key = UVec2::new(group[0], group[1]);
+        if let Some(e) = mapped_vertices.iter().find(|e| e.0 == key) {
+            // TODO: optimize this
+            indices.push(e.1)
+        } else {
+            let index = vertices.len() as u32;
+            indices.push(index);
+            vertices.push(Vertex {
+                position: positions[group[0] as usize],
+                normal: normals[group[2] as usize],
+                uv: uvs[group[1] as usize],
+            });
+            mapped_vertices.push((key, index))
+        }
+    }
+
+    object(renderer, vertices, indices, instances)
 }

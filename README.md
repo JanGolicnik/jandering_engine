@@ -12,6 +12,12 @@ I want to include things that may not necerssarily fall under a rendering engine
 - [wgsltoy](https://janyg.itch.io/wgsltoy) -> real time wgsl shader editor like Shader Toy
 - [dashy geometry](https://janyg.itch.io/wgsltoy)(geometry dash clone) -> geometry dash with map editing and bloom
 
+## Syntax
+
+This isnt the current syntax but I'd love to get it to this stage some day:
+
+    renderer.new_pass(shader).bind(bind_group_1).bind(bind_group_2).with_instances(instances).draw(object);
+
 ## Checklist
 
 - [x] rendering a simple triangle
