@@ -12,43 +12,40 @@ use super::{
     window::Window,
 };
 
-pub struct Buffer {
-    pub buffer: wgpu::Buffer,
-}
+#[derive(Copy, Clone)]
+pub struct BufferHandle(pub usize);
 
 pub struct BindGroupRenderData {
     pub bind_group_layout: wgpu::BindGroupLayout,
     pub bind_group: wgpu::BindGroup,
-    pub buffer: Buffer,
+    pub buffer_handle: BufferHandle,
 }
 
-pub struct TextureHandle(usize);
+#[derive(Copy, Clone)]
+pub struct TextureHandle(pub usize);
 
 pub struct Renderer {
-    surface: wgpu::Surface,
-    device: wgpu::Device,
+    pub(crate) surface: wgpu::Surface,
+    pub(crate) device: wgpu::Device,
     config: wgpu::SurfaceConfiguration,
     pub queue: wgpu::Queue,
     pub clear_color: (f32, f32, f32),
-    current_frame: Option<(
-        wgpu::CommandEncoder,
-        wgpu::SurfaceTexture,
-        wgpu::TextureView,
-    )>,
-    shaders: Vec<Shader>,
+    pub(crate) shaders: Vec<Shader>,
     bind_groups: Vec<Box<dyn BindGroup>>,
-    bind_groups_render_data: Vec<BindGroupRenderData>,
-    depth_texture: TextureHandle,
-    textures: Vec<Texture>,
+    pub(crate) bind_groups_render_data: Vec<BindGroupRenderData>,
+    pub(crate) depth_texture: TextureHandle,
+    pub(crate) textures: Vec<Texture>,
+    pub(crate) buffers: Vec<wgpu::Buffer>,
+    pub(crate) surface_data: Option<(wgpu::SurfaceTexture, wgpu::TextureView)>,
 }
 
 pub struct BindGroupHandle<T>(usize, std::marker::PhantomData<T>);
 
 #[derive(Copy, Clone)]
-pub struct UntypedBindGroupHandle(usize);
+pub struct UntypedBindGroupHandle(pub usize);
 
 #[derive(Copy, Clone)]
-pub struct ShaderHandle(usize);
+pub struct ShaderHandle(pub usize);
 
 impl Renderer {
     #[allow(clippy::borrowed_box)]
@@ -124,10 +121,11 @@ impl Renderer {
             textures,
             depth_texture: TextureHandle(0),
             clear_color: (0.0, 0.0, 0.0),
-            current_frame: None,
             shaders: Vec::new(),
             bind_groups: Vec::new(),
             bind_groups_render_data: Vec::new(),
+            buffers: Vec::new(),
+            surface_data: None,
         }
     }
 
@@ -159,11 +157,26 @@ impl Renderer {
         self.config.height
     }
 
-    pub fn new_pass<'a>(&'a mut self, shader: ShaderHandle) -> Box<dyn RenderPass + 'a> {
+    pub fn begin_frame(&mut self) {
+        let surface = match self.surface.get_current_texture() {
+            Ok(surface) => surface,
+            Err(e) => {
+                panic!("{e}");
+            }
+        };
+
+        let surface_view = surface
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
+        self.surface_data = Some((surface, surface_view));
+    }
+
+    pub fn new_pass<'renderer>(&'renderer mut self) -> Box<dyn RenderPass + 'renderer> {
         Box::new(WGPURenderPass::new(self))
     }
 
-    pub fn create_uniform_buffer(&self, contents: &[u8]) -> Buffer {
+    pub fn create_uniform_buffer(&mut self, contents: &[u8]) -> BufferHandle {
         let buffer = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -172,10 +185,11 @@ impl Renderer {
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             });
 
-        Buffer { buffer }
+        self.buffers.push(buffer);
+        BufferHandle(self.buffers.len() - 1)
     }
 
-    pub fn create_vertex_buffer(&self, contents: &[u8]) -> Buffer {
+    pub fn create_vertex_buffer(&mut self, contents: &[u8]) -> BufferHandle {
         let buffer = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -184,10 +198,11 @@ impl Renderer {
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             });
 
-        Buffer { buffer }
+        self.buffers.push(buffer);
+        BufferHandle(self.buffers.len() - 1)
     }
 
-    pub fn create_index_buffer(&self, contents: &[u8]) -> Buffer {
+    pub fn create_index_buffer(&mut self, contents: &[u8]) -> BufferHandle {
         let buffer = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -196,11 +211,12 @@ impl Renderer {
                 usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
             });
 
-        Buffer { buffer }
+        self.buffers.push(buffer);
+        BufferHandle(self.buffers.len() - 1)
     }
 
-    pub fn write_buffer(&mut self, buffer: &Buffer, data: &[u8]) {
-        self.queue.write_buffer(&buffer.buffer, 0, data);
+    pub fn write_buffer(&mut self, buffer: BufferHandle, data: &[u8]) {
+        self.queue.write_buffer(&self.buffers[buffer.0], 0, data);
     }
 
     pub fn create_shader(&mut self, desc: ShaderDescriptor) -> ShaderHandle {
@@ -281,7 +297,7 @@ impl Renderer {
 
     pub fn create_bind_group<T: BindGroup>(&mut self, bind_group: T) -> BindGroupHandle<T> {
         {
-            let buffer = self.create_uniform_buffer(&bind_group.get_data());
+            let buffer_handle = self.create_uniform_buffer(&bind_group.get_data());
 
             let bind_group_layout =
                 self.device
@@ -303,7 +319,7 @@ impl Renderer {
                 layout: &bind_group_layout,
                 entries: &[wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: buffer.buffer.as_entire_binding(),
+                    resource: self.buffers[buffer_handle.0].as_entire_binding(),
                 }],
                 label: Some("bind_group"),
             });
@@ -311,7 +327,7 @@ impl Renderer {
             self.bind_groups_render_data.push(BindGroupRenderData {
                 bind_group_layout,
                 bind_group,
-                buffer,
+                buffer_handle,
             });
         }
 
@@ -412,11 +428,9 @@ impl Renderer {
     }
 
     pub fn write_bind_group(&mut self, handle: UntypedBindGroupHandle, data: &[u8]) {
-        self.queue.write_buffer(
-            &self.bind_groups_render_data[handle.0].buffer.buffer,
-            0,
-            data,
-        );
+        let render_data = &self.bind_groups_render_data[handle.0];
+        self.queue
+            .write_buffer(&self.buffers[render_data.buffer_handle.0], 0, data);
     }
 
     fn create_depth_texture(device: &wgpu::Device, size: UVec2) -> Texture {
@@ -456,12 +470,46 @@ impl Renderer {
             height: size.y,
         }
     }
+
+    pub fn present(&mut self) {
+        let surface_data = self.surface_data.take();
+        surface_data.unwrap().0.present();
+    }
 }
 
-pub trait RenderPass<'a> {
-    fn render(&mut self, renderables: &[&dyn Renderable]) -> Box<Renderer>;
+pub trait RenderPass<'renderer> {
+    fn render(
+        self: Box<Self>,
+        renderables: &[&dyn Renderable],
+    ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
 
-    fn bind(self: Box<Self>, bind_group: UntypedBindGroupHandle) -> Box<dyn RenderPass<'a>>;
+    fn render_range(
+        self: Box<Self>,
+        renderables: &dyn Renderable,
+        range: Range<u32>,
+    ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
+
+    fn bind(
+        self: Box<Self>,
+        slot: u32,
+        bind_group: UntypedBindGroupHandle,
+    ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
+
+    fn submit(self: Box<Self>);
+
+    fn set_shader(
+        self: Box<Self>,
+        shader: ShaderHandle,
+    ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
+
+    fn with_depth(self: Box<Self>, value: f32) -> Box<dyn RenderPass<'renderer> + 'renderer>;
+
+    fn with_clear_color(
+        self: Box<Self>,
+        r: f32,
+        g: f32,
+        b: f32,
+    ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
 }
 
 impl<T> Clone for BindGroupHandle<T> {

@@ -1,8 +1,6 @@
-use std::ops::Range;
-
 use crate::types::*;
 
-use super::renderer::{Buffer, RenderPass, Renderer};
+use super::renderer::{BufferHandle, Renderer};
 
 pub mod primitives;
 
@@ -15,11 +13,11 @@ pub struct Vertex {
 }
 
 pub struct ObjectRenderData {
-    pub vertex_buffer: Buffer,
+    pub vertex_buffer: BufferHandle,
     //
-    pub index_buffer: Buffer,
+    pub index_buffer: BufferHandle,
     //
-    pub instance_buffer: Buffer,
+    pub instance_buffer: BufferHandle,
 }
 
 pub struct Object<T> {
@@ -66,12 +64,14 @@ impl Vertex {
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Instance {
     pub model: Mat4,
+    pub inv_model: Mat4,
 }
 
 impl Default for Instance {
     fn default() -> Self {
         Self {
             model: Mat4::IDENTITY,
+            inv_model: Mat4::IDENTITY,
         }
     }
 }
@@ -104,13 +104,50 @@ impl Instance {
                     shader_location: 8,
                     format: wgpu::VertexFormat::Float32x4,
                 },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 16]>() as wgpu::BufferAddress,
+                    shader_location: 9,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 20]>() as wgpu::BufferAddress,
+                    shader_location: 10,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 24]>() as wgpu::BufferAddress,
+                    shader_location: 11,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 28]>() as wgpu::BufferAddress,
+                    shader_location: 12,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
             ],
         }
     }
 
-    pub fn with_position(pos: Vec3) -> Self {
-        let model = Mat4::from_translation(pos);
-        Self { model }
+    pub fn translate(mut self, pos: Vec3) -> Self {
+        let (scale, rotation, translation) = self.model.to_scale_rotation_translation();
+        self.model = Mat4::from_scale_rotation_translation(scale, rotation, translation + pos);
+        self.inv_model = self.model.inverse();
+        self
+    }
+
+    pub fn rotate(mut self, angle: f32, axis: Vec3) -> Self {
+        let rotation_mat = Mat4::from_axis_angle(axis, angle);
+        self.model = rotation_mat * self.model;
+        self.inv_model = self.model.inverse();
+        self
+    }
+
+    pub fn scale(mut self, new_scale: f32) -> Self {
+        let (scale, rotation, translation) = self.model.to_scale_rotation_translation();
+        self.model =
+            Mat4::from_scale_rotation_translation(scale + new_scale, rotation, translation);
+        self.inv_model = self.model.inverse();
+        self
     }
 }
 
@@ -122,7 +159,7 @@ impl<T: bytemuck::Pod> Object<T> {
             self.previous_instances_len = self.instances.len();
         } else {
             renderer.write_buffer(
-                &self.render_data.instance_buffer,
+                self.render_data.instance_buffer,
                 bytemuck::cast_slice(&self.instances),
             );
         }
@@ -176,23 +213,27 @@ impl D2Instance {
 }
 
 pub trait Renderable {
-    // fn bind(&self, render_pass: Box<dyn RenderPass>, range: Range<u32>);
+    fn get_buffers(&self) -> (BufferHandle, BufferHandle, BufferHandle);
+
+    fn num_indices(&self) -> u32;
 
     fn num_instances(&self) -> u32;
 }
 
 impl<T: std::any::Any> Renderable for Object<T> {
-    // fn bind<'a, R: RenderPass<'a>>(&'a self, mut render_pass: R, range: Range<u32>) {
-    //     // render_pass.draw_instanced(
-    //     //     0..self.indices.len() as u32,
-    //     //     range,
-    //     //     &self.render_data.vertex_buffer,
-    //     //     &self.render_data.instance_buffer,
-    //     //     &self.render_data.index_buffer,
-    //     // );
-    // }
-
     fn num_instances(&self) -> u32 {
         self.previous_instances_len as u32
+    }
+
+    fn num_indices(&self) -> u32 {
+        self.indices.len() as u32
+    }
+
+    fn get_buffers(&self) -> (BufferHandle, BufferHandle, BufferHandle) {
+        (
+            self.render_data.vertex_buffer,
+            self.render_data.index_buffer,
+            self.render_data.instance_buffer,
+        )
     }
 }

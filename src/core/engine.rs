@@ -59,10 +59,14 @@ impl WindowEventHandler for Engine {
                 };
                 self.event_handler.as_mut().unwrap().on_update(&mut context);
 
+                self.renderer.begin_frame();
+
                 self.event_handler
                     .as_mut()
                     .unwrap()
                     .on_render(&mut self.renderer);
+
+                self.renderer.present();
 
                 window.request_redraw();
 

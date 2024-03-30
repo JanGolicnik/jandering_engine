@@ -1,3 +1,4 @@
+use glam::Vec4Swizzles;
 use jandering_engine::{
     core::{
         bind_group::{camera::free::FreeCameraBindGroup, BindGroup},
@@ -6,11 +7,13 @@ use jandering_engine::{
         object::{Instance, Object, Vertex},
         renderer::{BindGroupHandle, Renderer, ShaderHandle},
         shader::ShaderDescriptor,
-        window::WindowBuilder,
+        window::{InputState, Key, MouseButton, WindowBuilder, WindowEvent},
     },
-    types::{UVec2, Vec3},
+    types::{UVec2, Vec3, DEG_TO_RAD},
     utils::load_obj_from_text,
 };
+
+use rand::Rng;
 
 struct Application {
     last_time: web_time::Instant,
@@ -19,6 +22,7 @@ struct Application {
     ground: Object<Instance>,
     shader: ShaderHandle,
     camera: BindGroupHandle<FreeCameraBindGroup>,
+    is_in_fps: bool,
 }
 
 impl Application {
@@ -35,16 +39,40 @@ impl Application {
                 .with_backface_culling(false),
         );
 
+        let mut rand = rand::thread_rng();
+
+        let susane_instances = (0..10_000)
+            .map(|_| {
+                let height = (rand.gen::<f32>() as f32).powf(30.0) * 1000.0;
+                let pos = Vec3::new(
+                    rand.gen::<f32>() * 500.0 - 250.0,
+                    height,
+                    rand.gen::<f32>() * 500.0 - 250.0,
+                );
+                let axis = Vec3::new(
+                    rand.gen::<f32>() - 0.5,
+                    rand.gen::<f32>() - 0.5,
+                    rand.gen::<f32>() - 0.5,
+                );
+                let angle = rand.gen::<f32>() * 360.0;
+                Instance::default()
+                    .rotate(angle * DEG_TO_RAD, axis)
+                    .scale(1.0 + rand.gen::<f32>() * 10.0)
+                    .translate(pos)
+            })
+            .collect::<Vec<_>>();
         let susane = load_obj_from_text(
             include_str!("susane.obj"),
-            &engine.renderer,
-            vec![Instance::default()],
+            &mut engine.renderer,
+            susane_instances,
         );
 
         let ground = load_obj_from_text(
             include_str!("ground.obj"),
-            &engine.renderer,
-            vec![Instance::with_position(Vec3::new(0.0, -1.0, 0.0))],
+            &mut engine.renderer,
+            vec![Instance::default()
+                .translate(Vec3::new(0.0, -5.0, 0.0))
+                .scale(0.05)],
         );
 
         Self {
@@ -54,6 +82,7 @@ impl Application {
             ground,
             shader,
             camera,
+            is_in_fps: false,
         }
     }
 }
@@ -65,13 +94,44 @@ impl EventHandler for Application {
         self.last_time = current_time;
         self.time += dt;
 
-        context.renderer.clear_color.0 = (self.time).sin() * 0.5 + 0.5;
-        let resolution = UVec2::new(context.renderer.width(), context.renderer.height());
-        context
-            .renderer
-            .get_bind_group_t_mut(self.camera)
-            .unwrap()
-            .update(context.events, context.window, resolution, dt);
+        if self.is_in_fps {
+            context.renderer.clear_color.0 = (self.time).sin() * 0.5 + 0.5;
+            let resolution = UVec2::new(context.renderer.width(), context.renderer.height());
+            let camera = context.renderer.get_bind_group_t_mut(self.camera).unwrap();
+            camera.update(context.events, context.window, resolution, dt);
+
+            if context.events.iter().any(|e| {
+                matches!(
+                    e,
+                    WindowEvent::KeyInput {
+                        key: Key::Alt,
+                        state: InputState::Pressed
+                    }
+                )
+            }) {
+                self.is_in_fps = false;
+                context.window.set_cursor_visible(true);
+            }
+        } else if context.events.iter().any(|e| {
+            matches!(
+                e,
+                WindowEvent::MouseInput {
+                    button: MouseButton::Left,
+                    state: InputState::Pressed
+                }
+            )
+        }) {
+            self.is_in_fps = true;
+            context.window.set_cursor_visible(false);
+        }
+
+        self.susane.instances.iter_mut().for_each(|e| {
+            let position = e.model.col(3).xyz();
+            let t = position.y / 1000.0;
+            *e = e.translate(Vec3::new(0.0, self.time.sin() * t * 10.0, 0.0));
+        });
+
+        self.susane.update(context.renderer);
     }
 
     fn on_render(&mut self, renderer: &mut Box<Renderer>) {
@@ -79,9 +139,13 @@ impl EventHandler for Application {
         renderer.write_bind_group(self.camera.into(), &camera.get_data());
 
         renderer
-            .new_pass(self.shader)
-            .bind(self.camera.into())
-            .render(&[&self.ground, &self.susane]);
+            .new_pass()
+            .with_depth(1.0)
+            .with_clear_color(0.2, 0.5, 1.0)
+            .set_shader(self.shader)
+            .bind(0, self.camera.into())
+            .render(&[&self.ground, &self.susane])
+            .submit();
     }
 }
 

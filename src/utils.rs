@@ -72,7 +72,7 @@ pub async fn load_text(file: FilePath<'_>) -> anyhow::Result<String> {
 
 pub fn load_obj_from_text<I: bytemuck::Pod>(
     data: &str,
-    renderer: &Renderer,
+    renderer: &mut Renderer,
     instances: Vec<I>,
 ) -> Object<I> {
     let mut positions = Vec::new();

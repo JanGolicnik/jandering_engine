@@ -2,7 +2,7 @@ use crate::core::renderer::Renderer;
 
 use super::{Object, ObjectRenderData, Vec2, Vec3, Vertex};
 
-pub fn triangle<T>(renderer: &Renderer, instances: Vec<T>) -> Object<T>
+pub fn triangle<T>(renderer: &mut Renderer, instances: Vec<T>) -> Object<T>
 where
     T: bytemuck::Pod,
 {
@@ -49,7 +49,7 @@ where
 }
 
 pub fn object<T>(
-    renderer: &Renderer,
+    renderer: &mut Renderer,
     vertices: Vec<Vertex>,
     indices: Vec<u32>,
     instances: Vec<T>,

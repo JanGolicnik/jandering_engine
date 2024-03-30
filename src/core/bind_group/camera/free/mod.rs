@@ -212,6 +212,7 @@ impl FreeCameraController {
                     Key::D => self.right_pressed = is_pressed,
                     Key::S => self.forward_pressed = is_pressed,
                     Key::W => self.backward_pressed = is_pressed,
+                    Key::Shift => self.is_shift_pressed = is_pressed,
                     _ => {}
                 }
             }
