@@ -1,9 +1,13 @@
 use std::any::Any;
 
+use super::renderer::{BufferHandle, Renderer, TextureHandle};
+
 pub mod camera;
 pub mod resolution;
+pub mod texture;
 pub trait BindGroup: Any + BindGroupToAny {
     fn get_data(&self) -> Box<[u8]>;
+    fn get_layout(&self, renderer: &mut Renderer) -> BindGroupLayout;
 }
 
 pub trait BindGroupToAny {
@@ -21,12 +25,14 @@ impl<T: 'static> BindGroupToAny for T {
     }
 }
 
+#[derive(Clone)]
 pub enum BindGroupLayoutEntry {
-    Data,
-    Texture,
-    Sampler,
+    Data(BufferHandle),
+    Texture(TextureHandle),
+    Sampler(TextureHandle),
 }
 
+#[derive(Clone)]
 pub struct BindGroupLayout {
     pub entries: Vec<BindGroupLayoutEntry>,
 }

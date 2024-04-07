@@ -1,4 +1,4 @@
-use crate::types::*;
+use crate::{types::*, utils::load_obj};
 
 use super::renderer::{BufferHandle, Renderer};
 
@@ -152,6 +152,37 @@ impl Instance {
 }
 
 impl<T: bytemuck::Pod> Object<T> {
+    pub fn new(
+        renderer: &mut Renderer,
+        vertices: Vec<Vertex>,
+        indices: Vec<u32>,
+        instances: Vec<T>,
+    ) -> Object<T>
+    where
+        T: bytemuck::Pod,
+    {
+        let render_data = {
+            let vertex_buffer = renderer.create_vertex_buffer(bytemuck::cast_slice(&vertices));
+            let instance_buffer = renderer.create_vertex_buffer(bytemuck::cast_slice(&instances));
+            let index_buffer = renderer.create_index_buffer(bytemuck::cast_slice(&indices));
+            ObjectRenderData {
+                vertex_buffer,
+                instance_buffer,
+                index_buffer,
+            }
+        };
+
+        let previous_instances_len = instances.len();
+
+        Object {
+            vertices,
+            indices,
+            instances,
+            render_data,
+            previous_instances_len,
+        }
+    }
+
     pub fn update(&mut self, renderer: &mut Renderer) {
         if self.previous_instances_len != self.instances.len() {
             self.render_data.instance_buffer =
@@ -163,6 +194,11 @@ impl<T: bytemuck::Pod> Object<T> {
                 bytemuck::cast_slice(&self.instances),
             );
         }
+    }
+
+    pub fn from_obj(data: &str, renderer: &mut Renderer, instances: Vec<T>) -> Object<T> {
+        let (vertices, indices) = load_obj(data);
+        Self::new(renderer, vertices, indices, instances)
     }
 }
 
@@ -213,7 +249,7 @@ impl D2Instance {
 }
 
 pub trait Renderable {
-    fn get_buffers(&self) -> (BufferHandle, BufferHandle, BufferHandle);
+    fn get_buffers(&self) -> (BufferHandle, BufferHandle, Option<BufferHandle>);
 
     fn num_indices(&self) -> u32;
 
@@ -229,11 +265,21 @@ impl<T: std::any::Any> Renderable for Object<T> {
         self.indices.len() as u32
     }
 
-    fn get_buffers(&self) -> (BufferHandle, BufferHandle, BufferHandle) {
+    fn get_buffers(&self) -> (BufferHandle, BufferHandle, Option<BufferHandle>) {
         (
             self.render_data.vertex_buffer,
             self.render_data.index_buffer,
-            self.render_data.instance_buffer,
+            Some(self.render_data.instance_buffer),
         )
+    }
+}
+
+impl Default for Vertex {
+    fn default() -> Self {
+        Self {
+            position: Vec3::ZERO,
+            normal: Vec3::ZERO,
+            uv: Vec2::ZERO,
+        }
     }
 }

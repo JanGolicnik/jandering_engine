@@ -16,12 +16,7 @@ pub struct Engine {
 impl Engine {
     pub fn new(builder: EngineBuilder) -> Self {
         let window: Box<dyn Window> = Box::new(WinitWindow::new(builder.window_builder));
-        let mut renderer = pollster::block_on(Renderer::new(&window));
-        renderer.clear_color = (
-            builder.clear_color.x,
-            builder.clear_color.y,
-            builder.clear_color.z,
-        );
+        let renderer = pollster::block_on(Renderer::new(&window));
 
         Self {
             events: Vec::new(),

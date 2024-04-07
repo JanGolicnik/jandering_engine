@@ -102,11 +102,13 @@ impl<'renderer> RenderPass<'renderer> for WGPURenderPass<'renderer> {
             );
         }
 
-        let (vertex_buffer_handle, index_buffer_handle, instance_buffer_handle) =
-            renderable.get_buffers();
+        let (vertex_buffer_handle, index_buffer_handle, instance_buffer) = renderable.get_buffers();
 
         render_pass.set_vertex_buffer(0, self.renderer.buffers[vertex_buffer_handle.0].slice(..));
-        render_pass.set_vertex_buffer(1, self.renderer.buffers[instance_buffer_handle.0].slice(..));
+        if let Some(instance_buffer_handle) = instance_buffer {
+            render_pass
+                .set_vertex_buffer(1, self.renderer.buffers[instance_buffer_handle.0].slice(..));
+        }
         render_pass.set_index_buffer(
             self.renderer.buffers[index_buffer_handle.0].slice(..),
             wgpu::IndexFormat::Uint32,
@@ -164,6 +166,11 @@ impl<'renderer> RenderPass<'renderer> for WGPURenderPass<'renderer> {
         b: f32,
     ) -> Box<dyn RenderPass<'renderer> + 'renderer> {
         self.clear_color = Some(Vec3::new(r, g, b));
+        self
+    }
+
+    fn unbind(mut self: Box<Self>, slot: u32) -> Box<dyn RenderPass<'renderer> + 'renderer> {
+        self.bind_groups.remove(&slot);
         self
     }
 }

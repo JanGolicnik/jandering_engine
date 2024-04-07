@@ -8,7 +8,7 @@ use super::{
     bind_group::{BindGroup, BindGroupLayout, BindGroupLayoutEntry},
     object::Renderable,
     shader::{Shader, ShaderDescriptor},
-    texture::Texture,
+    texture::{Texture, TextureDescriptor},
     window::Window,
 };
 
@@ -29,7 +29,6 @@ pub struct Renderer {
     pub(crate) device: wgpu::Device,
     config: wgpu::SurfaceConfiguration,
     pub queue: wgpu::Queue,
-    pub clear_color: (f32, f32, f32),
     pub(crate) shaders: Vec<Shader>,
     bind_groups: Vec<Box<dyn BindGroup>>,
     pub(crate) bind_groups_render_data: Vec<BindGroupRenderData>,
@@ -108,25 +107,27 @@ impl Renderer {
 
         surface.configure(&device, &config);
 
-        let textures = vec![Self::create_depth_texture(
-            &device,
-            UVec2::new(config.width, config.height),
-        )];
-
-        Self {
+        let mut ret = Self {
             surface,
             device,
             config,
             queue,
-            textures,
+            textures: Vec::new(),
             depth_texture: TextureHandle(0),
-            clear_color: (0.0, 0.0, 0.0),
             shaders: Vec::new(),
             bind_groups: Vec::new(),
             bind_groups_render_data: Vec::new(),
             buffers: Vec::new(),
             surface_data: None,
-        }
+        };
+
+        ret.create_texture(TextureDescriptor {
+            size: UVec2::new(ret.config.width, ret.config.height),
+            format: wgpu::TextureFormat::Depth32Float,
+            ..Default::default()
+        });
+
+        ret
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
@@ -134,9 +135,13 @@ impl Renderer {
             self.config.width = width;
             self.config.height = height;
             self.surface.configure(&self.device, &self.config);
-            self.textures[0] = Self::create_depth_texture(
-                &self.device,
-                UVec2::new(self.config.width, self.config.height),
+            self.re_create_texture(
+                TextureDescriptor {
+                    size: UVec2::new(self.config.width, self.config.height),
+                    format: wgpu::TextureFormat::Depth32Float,
+                    ..Default::default()
+                },
+                self.depth_texture,
             );
         }
     }
@@ -260,7 +265,11 @@ impl Renderer {
                     targets,
                 }),
                 primitive: wgpu::PrimitiveState {
-                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    topology: if desc.stripped {
+                        wgpu::PrimitiveTopology::TriangleStrip
+                    } else {
+                        wgpu::PrimitiveTopology::TriangleList
+                    },
                     strip_index_format: None,
                     front_face: wgpu::FrontFace::Ccw,
                     cull_mode: if desc.backface_culling {
@@ -284,7 +293,7 @@ impl Renderer {
                     None
                 },
                 multisample: wgpu::MultisampleState {
-                    count: 1,
+                    count: desc.multisample,
                     mask: !0,
                     alpha_to_coverage_enabled: false,
                 },
@@ -297,37 +306,40 @@ impl Renderer {
 
     pub fn create_bind_group<T: BindGroup>(&mut self, bind_group: T) -> BindGroupHandle<T> {
         {
-            let buffer_handle = self.create_uniform_buffer(&bind_group.get_data());
-
-            let bind_group_layout =
-                self.device
-                    .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                        entries: &[wgpu::BindGroupLayoutEntry {
-                            binding: 0,
-                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                            ty: wgpu::BindingType::Buffer {
-                                ty: wgpu::BufferBindingType::Uniform,
-                                has_dynamic_offset: false,
-                                min_binding_size: None,
-                            },
-                            count: None,
-                        }],
-                        label: Some("bind_group_layout"),
-                    });
+            let layout = bind_group.get_layout(self);
+            let bind_group_layout = Self::get_layout(&self.device, &layout);
+            let mut first_handle = BufferHandle(0); // TODO FIX THIS LMAO
+            let entries = layout
+                .entries
+                .iter()
+                .enumerate()
+                .map(|(i, entry)| wgpu::BindGroupEntry {
+                    binding: i as u32,
+                    resource: match entry {
+                        BindGroupLayoutEntry::Data(handle) => {
+                            first_handle = *handle;
+                            self.buffers[handle.0].as_entire_binding()
+                        }
+                        BindGroupLayoutEntry::Texture(handle) => {
+                            wgpu::BindingResource::TextureView(&self.textures[handle.0].view)
+                        }
+                        BindGroupLayoutEntry::Sampler(handle) => {
+                            wgpu::BindingResource::Sampler(&self.textures[handle.0].sampler)
+                        }
+                    },
+                })
+                .collect::<Vec<_>>();
 
             let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 layout: &bind_group_layout,
-                entries: &[wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: self.buffers[buffer_handle.0].as_entire_binding(),
-                }],
+                entries: &entries[..],
                 label: Some("bind_group"),
             });
 
             self.bind_groups_render_data.push(BindGroupRenderData {
                 bind_group_layout,
                 bind_group,
-                buffer_handle,
+                buffer_handle: first_handle,
             });
         }
 
@@ -379,51 +391,53 @@ impl Renderer {
         None
     }
 
+    pub fn get_layout(device: &wgpu::Device, layout: &BindGroupLayout) -> wgpu::BindGroupLayout {
+        let entries: Vec<_> = layout
+            .entries
+            .iter()
+            .map(|e| match e {
+                BindGroupLayoutEntry::Data(_) => wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                BindGroupLayoutEntry::Texture(_) => wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                BindGroupLayoutEntry::Sampler(_) => wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            })
+            .collect();
+
+        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &entries,
+            label: Some("bind_group_layout"),
+        })
+    }
+
     pub fn get_layouts(
         device: &wgpu::Device,
         layouts: &[BindGroupLayout],
     ) -> Vec<wgpu::BindGroupLayout> {
         layouts
             .iter()
-            .map(|e| {
-                let entries: Vec<_> = e
-                    .entries
-                    .iter()
-                    .map(|e| match e {
-                        BindGroupLayoutEntry::Data => wgpu::BindGroupLayoutEntry {
-                            binding: 0,
-                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                            ty: wgpu::BindingType::Buffer {
-                                ty: wgpu::BufferBindingType::Uniform,
-                                has_dynamic_offset: false,
-                                min_binding_size: None,
-                            },
-                            count: None,
-                        },
-                        BindGroupLayoutEntry::Texture => wgpu::BindGroupLayoutEntry {
-                            binding: 0,
-                            visibility: wgpu::ShaderStages::FRAGMENT,
-                            ty: wgpu::BindingType::Texture {
-                                sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                                view_dimension: wgpu::TextureViewDimension::D2,
-                                multisampled: false,
-                            },
-                            count: None,
-                        },
-                        BindGroupLayoutEntry::Sampler => wgpu::BindGroupLayoutEntry {
-                            binding: 1,
-                            visibility: wgpu::ShaderStages::FRAGMENT,
-                            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                            count: None,
-                        },
-                    })
-                    .collect();
-
-                device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                    entries: &entries,
-                    label: Some("bind_group_layout"),
-                })
-            })
+            .map(|e| Self::get_layout(device, e))
             .collect()
     }
 
@@ -433,23 +447,25 @@ impl Renderer {
             .write_buffer(&self.buffers[render_data.buffer_handle.0], 0, data);
     }
 
-    fn create_depth_texture(device: &wgpu::Device, size: UVec2) -> Texture {
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
+    fn create_texture_at(&mut self, desc: TextureDescriptor, handle: TextureHandle) {
+        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("texture"),
             size: wgpu::Extent3d {
-                width: size.x,
-                height: size.y,
+                width: desc.size.x,
+                height: desc.size.y,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
-            sample_count: 1,
+            sample_count: desc.sample_count,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Depth32Float,
+            format: desc.format,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             view_formats: &[],
         });
+
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+
+        let sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
@@ -462,18 +478,47 @@ impl Renderer {
             ..Default::default()
         });
 
-        Texture {
+        let texture = Texture {
             texture,
             sampler,
             view,
-            width: size.x,
-            height: size.y,
+            width: desc.size.x,
+            height: desc.size.y,
+        };
+
+        if handle.0 >= self.textures.len() {
+            self.textures.push(texture);
+        } else {
+            self.textures[handle.0] = texture;
         }
+    }
+
+    pub fn create_texture(&mut self, desc: TextureDescriptor) -> TextureHandle {
+        self.create_texture_at(desc, TextureHandle(self.textures.len()));
+        TextureHandle(self.textures.len() - 1)
+    }
+
+    pub fn re_create_texture(
+        &mut self,
+        desc: TextureDescriptor,
+        handle: TextureHandle,
+    ) -> TextureHandle {
+        self.create_texture_at(desc, handle);
+        TextureHandle(self.textures.len() - 1)
     }
 
     pub fn present(&mut self) {
         let surface_data = self.surface_data.take();
         surface_data.unwrap().0.present();
+    }
+
+    pub fn add_texture(&mut self, texture: Texture) -> TextureHandle {
+        self.textures.push(texture);
+        TextureHandle(self.textures.len() - 1)
+    }
+
+    pub fn get_texture(&self, handle: TextureHandle) -> Option<&Texture> {
+        self.textures.get(handle.0)
     }
 }
 
@@ -494,6 +539,8 @@ pub trait RenderPass<'renderer> {
         slot: u32,
         bind_group: UntypedBindGroupHandle,
     ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
+
+    fn unbind(self: Box<Self>, slot: u32) -> Box<dyn RenderPass<'renderer> + 'renderer>;
 
     fn submit(self: Box<Self>);
 

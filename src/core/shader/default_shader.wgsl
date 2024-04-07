@@ -6,6 +6,11 @@ struct Camera {
 @group(0) @binding(0)
 var<uniform> camera: Camera;
 
+@group(1) @binding(0)
+var tex: texture_2d<f32>;
+@group(1) @binding(1)
+var tex_sampler: sampler;
+
 struct InstanceInput{
     @location(5) model_matrix_0: vec4<f32>,
     @location(6) model_matrix_1: vec4<f32>,

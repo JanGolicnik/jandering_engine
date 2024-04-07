@@ -12,6 +12,8 @@ pub struct ShaderDescriptor<'a> {
     pub fs_entry: &'a str,
     pub backface_culling: bool,
     pub depth: bool,
+    pub stripped: bool,
+    pub multisample: u32,
 }
 
 impl<'a> Default for ShaderDescriptor<'a> {
@@ -24,6 +26,8 @@ impl<'a> Default for ShaderDescriptor<'a> {
             fs_entry: "fs_main",
             backface_culling: true,
             depth: false,
+            stripped: false,
+            multisample: 1,
         }
     }
 }
@@ -52,8 +56,24 @@ impl<'a> ShaderDescriptor<'a> {
         self.bind_group_layouts = layouts;
         self
     }
+
     pub fn with_depth(mut self, value: bool) -> Self {
         self.depth = value;
+        self
+    }
+
+    pub fn with_source(mut self, code: &'static str) -> Self {
+        self.code = code;
+        self
+    }
+
+    pub fn with_stripping(mut self, value: bool) -> Self {
+        self.stripped = value;
+        self
+    }
+
+    pub fn with_multisample(mut self, value: u32) -> Self {
+        self.multisample = value;
         self
     }
 }

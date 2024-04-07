@@ -48,37 +48,6 @@ where
     }
 }
 
-pub fn object<T>(
-    renderer: &mut Renderer,
-    vertices: Vec<Vertex>,
-    indices: Vec<u32>,
-    instances: Vec<T>,
-) -> Object<T>
-where
-    T: bytemuck::Pod,
-{
-    let render_data = {
-        let vertex_buffer = renderer.create_vertex_buffer(bytemuck::cast_slice(&vertices));
-        let instance_buffer = renderer.create_vertex_buffer(bytemuck::cast_slice(&instances));
-        let index_buffer = renderer.create_index_buffer(bytemuck::cast_slice(&indices));
-        ObjectRenderData {
-            vertex_buffer,
-            instance_buffer,
-            index_buffer,
-        }
-    };
-
-    let previous_instances_len = instances.len();
-
-    Object {
-        vertices,
-        indices,
-        instances,
-        render_data,
-        previous_instances_len,
-    }
-}
-
 // pub fn quad<T>(renderer: &Renderer, instances: Vec<T>) -> Object<T>
 // where
 //     T: bytemuck::Pod,
@@ -213,6 +182,58 @@ where
 //             index_buffer,
 //             instance_buffer,
 //         }),
+//         previous_instances_len,
+//     }
+// }
+
+// pub fn plane_stripped<T>(renderer: &mut Renderer, instances: Vec<T>, subdivisions: u32) -> Object<T>
+// where
+//     T: bytemuck::Pod,
+// {
+//     let mut vertices = Vec::new();
+
+//     let step = 1.0 / (subdivisions + 1) as f32;
+
+//     for x in 0..subdivisions + 1 {
+//         let position = Vec3::new(-0.5 + x as f32 * step, 0.0, -0.5);
+//         vertices.push(Vertex {
+//             position,
+//             ..Default::default()
+//         });
+
+//         let position = Vec3::new(-0.5 + x as f32 * step, 0.0, -0.5 + step);
+//         vertices.push(Vertex {
+//             position,
+//             ..Default::default()
+//         });
+
+//         let position = Vec3::new(-0.5 + (x + 1) as f32 * step, 0.0, -0.5);
+//         vertices.push(Vertex {
+//             position,
+//             ..Default::default()
+//         });
+//     }
+
+//     let indices = vec![0, 1, 2];
+
+//     let render_data = {
+//         let vertex_buffer = renderer.create_vertex_buffer(bytemuck::cast_slice(&vertices));
+//         let instance_buffer = renderer.create_vertex_buffer(bytemuck::cast_slice(&instances));
+//         let index_buffer = renderer.create_index_buffer(bytemuck::cast_slice(&indices));
+//         ObjectRenderData {
+//             vertex_buffer,
+//             instance_buffer,
+//             index_buffer,
+//         }
+//     };
+
+//     let previous_instances_len = instances.len();
+
+//     Object {
+//         vertices,
+//         indices,
+//         instances,
+//         render_data,
 //         previous_instances_len,
 //     }
 // }

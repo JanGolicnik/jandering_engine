@@ -19,6 +19,13 @@ impl BindGroup for ResolutionBindGroup {
     fn get_data(&self) -> Box<[u8]> {
         bytemuck::cast_slice(&[self.data]).into()
     }
+
+    fn get_layout(&self, renderer: &mut Renderer) -> BindGroupLayout {
+        let buffer_handle = renderer.create_uniform_buffer(&self.get_data());
+        BindGroupLayout {
+            entries: vec![BindGroupLayoutEntry::Data(buffer_handle)],
+        }
+    }
 }
 
 impl ResolutionBindGroup {
@@ -34,12 +41,5 @@ impl ResolutionBindGroup {
 
     pub fn update(&mut self, resolution: UVec2) {
         self.data.resolution = resolution.into();
-    }
-
-    #[allow(dead_code)]
-    fn layout() -> BindGroupLayout {
-        BindGroupLayout {
-            entries: vec![BindGroupLayoutEntry::Data],
-        }
     }
 }

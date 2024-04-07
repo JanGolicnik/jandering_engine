@@ -1,6 +1,7 @@
 use crate::{
     core::{
         bind_group::{BindGroup, BindGroupLayout, BindGroupLayoutEntry},
+        renderer::{BufferHandle, Renderer},
         window::{InputState, Key, Window, WindowEvent},
     },
     types::{Mat4, UVec2, Vec3, DEG_TO_RAD},
@@ -55,6 +56,13 @@ pub struct FreeCameraBindGroup {
 impl BindGroup for FreeCameraBindGroup {
     fn get_data(&self) -> Box<[u8]> {
         bytemuck::cast_slice(&[self.data]).into()
+    }
+
+    fn get_layout(&self, renderer: &mut Renderer) -> BindGroupLayout {
+        let buffer_handle = renderer.create_uniform_buffer(&self.get_data());
+        BindGroupLayout {
+            entries: vec![BindGroupLayoutEntry::Data(buffer_handle)],
+        }
     }
 }
 
@@ -161,9 +169,9 @@ impl FreeCameraBindGroup {
         self.update_data()
     }
 
-    pub fn layout() -> BindGroupLayout {
+    pub fn get_layout() -> BindGroupLayout {
         BindGroupLayout {
-            entries: vec![BindGroupLayoutEntry::Data],
+            entries: vec![BindGroupLayoutEntry::Data(BufferHandle(0))],
         }
     }
 }

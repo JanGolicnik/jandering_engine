@@ -1,10 +1,7 @@
 use std::path::PathBuf;
 
 use crate::{
-    core::{
-        object::{primitives::object, Object, Vertex},
-        renderer::Renderer,
-    },
+    core::object::Vertex,
     types::{UVec2, Vec2, Vec3},
 };
 pub enum FilePath<'a> {
@@ -70,11 +67,7 @@ pub async fn load_text(file: FilePath<'_>) -> anyhow::Result<String> {
     }
 }
 
-pub fn load_obj_from_text<I: bytemuck::Pod>(
-    data: &str,
-    renderer: &mut Renderer,
-    instances: Vec<I>,
-) -> Object<I> {
+pub fn load_obj(data: &str) -> (Vec<Vertex>, Vec<u32>) {
     let mut positions = Vec::new();
     let mut normals = Vec::new();
     let mut uvs = Vec::new();
@@ -138,5 +131,5 @@ pub fn load_obj_from_text<I: bytemuck::Pod>(
         }
     }
 
-    object(renderer, vertices, indices, instances)
+    (vertices, indices)
 }
