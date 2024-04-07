@@ -45,6 +45,7 @@ impl WindowEventHandler for Engine {
             WindowEvent::Resized((width, height)) => {
                 window.resize(width, height);
                 self.renderer.resize(width, height);
+                self.events.push(event);
             }
             WindowEvent::RedrawRequested => {
                 let mut context = EngineContext {

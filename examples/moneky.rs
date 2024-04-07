@@ -5,11 +5,12 @@ use jandering_engine::{
         engine::{Engine, EngineBuilder, EngineContext},
         event_handler::EventHandler,
         object::{Instance, Object, Vertex},
-        renderer::{BindGroupHandle, Renderer, ShaderHandle},
+        renderer::{BindGroupHandle, Renderer, ShaderHandle, TextureHandle},
         shader::ShaderDescriptor,
+        texture::TextureDescriptor,
         window::{InputState, Key, MouseButton, WindowBuilder, WindowEvent},
     },
-    types::{UVec2, Vec3, DEG_TO_RAD},
+    types::{Vec3, DEG_TO_RAD},
 };
 
 use rand::Rng;
@@ -22,6 +23,7 @@ struct Application {
     shader: ShaderHandle,
     camera: BindGroupHandle<FreeCameraBindGroup>,
     is_in_fps: bool,
+    depth_texture: TextureHandle,
 }
 
 impl Application {
@@ -75,6 +77,12 @@ impl Application {
                 .scale(0.05)],
         );
 
+        let depth_texture = engine.renderer.create_texture(TextureDescriptor {
+            size: engine.renderer.size(),
+            format: wgpu::TextureFormat::Depth32Float,
+            ..Default::default()
+        });
+
         Self {
             last_time: web_time::Instant::now(),
             time: 0.0,
@@ -83,6 +91,7 @@ impl Application {
             shader,
             camera,
             is_in_fps: false,
+            depth_texture,
         }
     }
 }
@@ -95,7 +104,7 @@ impl EventHandler for Application {
         self.time += dt;
 
         if self.is_in_fps {
-            let resolution = UVec2::new(context.renderer.width(), context.renderer.height());
+            let resolution = context.renderer.size();
             let camera = context.renderer.get_bind_group_t_mut(self.camera).unwrap();
             camera.update(context.events, context.window, resolution, dt);
 
@@ -139,7 +148,7 @@ impl EventHandler for Application {
 
         renderer
             .new_pass()
-            .with_depth(1.0)
+            .with_depth(self.depth_texture, Some(1.0))
             .with_clear_color(0.2, 0.5, 1.0)
             .set_shader(self.shader)
             .bind(0, self.camera.into())

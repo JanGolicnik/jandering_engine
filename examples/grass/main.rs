@@ -8,12 +8,12 @@ use jandering_engine::{
         engine::{Engine, EngineBuilder, EngineContext},
         event_handler::EventHandler,
         object::{Instance, Object, Vertex},
-        renderer::{BindGroupHandle, BufferHandle, Renderer, ShaderHandle},
+        renderer::{BindGroupHandle, BufferHandle, Renderer, ShaderHandle, TextureHandle},
         shader::ShaderDescriptor,
         texture::{Texture, TextureDescriptor},
         window::{InputState, Key, MouseButton, WindowBuilder, WindowEvent},
     },
-    types::{UVec2, Vec3},
+    types::Vec3,
 };
 
 struct Application {
@@ -31,6 +31,9 @@ struct Application {
     camera: BindGroupHandle<FreeCameraBindGroup>,
     render_data: BindGroupHandle<RenderDataBindGroup>,
     is_in_fps: bool,
+
+    multisample_texture: TextureHandle,
+    depth_texture: TextureHandle,
 }
 
 mod grass_object;
@@ -44,6 +47,8 @@ const GRASS_LOD1_N: u32 = (GRASS_LOD1_AREA * GRASS_DENSITY) as u32;
 const GRASS_LOD2_SIDE: f32 = 1000.0;
 const GRASS_LOD2_AREA: f32 = GRASS_LOD2_SIDE * GRASS_LOD2_SIDE;
 const GRASS_LOD2_N: u32 = (GRASS_LOD2_AREA * GRASS_DENSITY) as u32;
+
+const MULTISAMPLE: u32 = 4;
 
 impl Application {
     pub async fn new(engine: &mut Engine) -> Self {
@@ -65,7 +70,7 @@ impl Application {
                 ])
                 .with_depth(true)
                 .with_backface_culling(false)
-                // .with_multisample(4)
+                .with_multisample(MULTISAMPLE)
                 .with_source(include_str!("grass_shader.wgsl")),
         );
 
@@ -77,9 +82,9 @@ impl Application {
                     render_data_bind_group_layout.clone(),
                     TextureBindGroup::get_layout(),
                 ])
-                .with_depth(true)
                 .with_backface_culling(false)
-                // .with_multisample(4)
+                .with_depth(true)
+                .with_multisample(MULTISAMPLE)
                 .with_source(include_str!("ground_shader.wgsl")),
         );
 
@@ -122,6 +127,19 @@ impl Application {
         let noise_texture = TextureBindGroup::new(&mut engine.renderer, noise_handle);
         let noise_texture = engine.renderer.create_bind_group(noise_texture);
 
+        let multisample_texture = engine.renderer.create_texture(TextureDescriptor {
+            size: engine.renderer.size(),
+            sample_count: MULTISAMPLE,
+            ..Default::default()
+        });
+
+        let depth_texture = engine.renderer.create_texture(TextureDescriptor {
+            size: engine.renderer.size(),
+            sample_count: MULTISAMPLE,
+            format: wgpu::TextureFormat::Depth32Float,
+            ..Default::default()
+        });
+
         Self {
             last_time: web_time::Instant::now(),
             time: 0.0,
@@ -137,6 +155,8 @@ impl Application {
             camera,
             render_data,
             is_in_fps: false,
+            multisample_texture,
+            depth_texture,
         }
     }
 
@@ -182,7 +202,7 @@ impl EventHandler for Application {
         render_data.data.time += dt;
 
         if self.is_in_fps {
-            let resolution = UVec2::new(context.renderer.width(), context.renderer.height());
+            let resolution = context.renderer.size();
             let camera = context.renderer.get_bind_group_t_mut(self.camera).unwrap();
             camera.update(context.events, context.window, resolution, dt);
 
@@ -210,6 +230,31 @@ impl EventHandler for Application {
             self.is_in_fps = true;
             context.window.set_cursor_visible(false);
         }
+
+        if context
+            .events
+            .iter()
+            .any(|e| matches!(e, WindowEvent::Resized(_)))
+        {
+            context.renderer.re_create_texture(
+                TextureDescriptor {
+                    size: context.renderer.size(),
+                    format: wgpu::TextureFormat::Depth32Float,
+                    sample_count: MULTISAMPLE,
+                    ..Default::default()
+                },
+                self.depth_texture,
+            );
+
+            context.renderer.re_create_texture(
+                TextureDescriptor {
+                    size: context.renderer.size(),
+                    sample_count: MULTISAMPLE,
+                    ..Default::default()
+                },
+                self.multisample_texture,
+            );
+        }
     }
 
     fn on_render(&mut self, renderer: &mut Box<Renderer>) {
@@ -221,7 +266,8 @@ impl EventHandler for Application {
         renderer
             .new_pass()
             .set_shader(self.ground_shader)
-            .with_depth(1.0)
+            .with_target_texture_resolve(self.multisample_texture, None)
+            .with_depth(self.depth_texture, Some(1.0))
             .with_clear_color(0.2, 0.5, 1.0)
             .bind(0, self.camera.into())
             .bind(1, self.render_data.into())
@@ -237,6 +283,8 @@ impl EventHandler for Application {
         renderer
             .new_pass()
             .set_shader(self.grass_shader)
+            .with_depth(self.depth_texture, None)
+            .with_target_texture_resolve(self.multisample_texture, None)
             .bind(0, self.camera.into())
             .bind(1, self.render_data.into())
             .bind(2, self.heightmap_texture.into())

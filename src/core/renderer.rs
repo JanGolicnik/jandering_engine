@@ -32,7 +32,6 @@ pub struct Renderer {
     pub(crate) shaders: Vec<Shader>,
     bind_groups: Vec<Box<dyn BindGroup>>,
     pub(crate) bind_groups_render_data: Vec<BindGroupRenderData>,
-    pub(crate) depth_texture: TextureHandle,
     pub(crate) textures: Vec<Texture>,
     pub(crate) buffers: Vec<wgpu::Buffer>,
     pub(crate) surface_data: Option<(wgpu::SurfaceTexture, wgpu::TextureView)>,
@@ -107,27 +106,18 @@ impl Renderer {
 
         surface.configure(&device, &config);
 
-        let mut ret = Self {
+        Self {
             surface,
             device,
             config,
             queue,
             textures: Vec::new(),
-            depth_texture: TextureHandle(0),
             shaders: Vec::new(),
             bind_groups: Vec::new(),
             bind_groups_render_data: Vec::new(),
             buffers: Vec::new(),
             surface_data: None,
-        };
-
-        ret.create_texture(TextureDescriptor {
-            size: UVec2::new(ret.config.width, ret.config.height),
-            format: wgpu::TextureFormat::Depth32Float,
-            ..Default::default()
-        });
-
-        ret
+        }
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
@@ -135,31 +125,19 @@ impl Renderer {
             self.config.width = width;
             self.config.height = height;
             self.surface.configure(&self.device, &self.config);
-            self.re_create_texture(
-                TextureDescriptor {
-                    size: UVec2::new(self.config.width, self.config.height),
-                    format: wgpu::TextureFormat::Depth32Float,
-                    ..Default::default()
-                },
-                self.depth_texture,
-            );
         }
     }
 
     pub fn set_width(&mut self, width: u32) {
-        self.resize(width, self.height())
+        self.resize(width, self.size().y)
     }
 
     pub fn set_height(&mut self, height: u32) {
-        self.resize(self.width(), height)
+        self.resize(self.size().x, height)
     }
 
-    pub fn width(&self) -> u32 {
-        self.config.width
-    }
-
-    pub fn height(&self) -> u32 {
-        self.config.height
+    pub fn size(&self) -> UVec2 {
+        UVec2::new(self.config.width, self.config.height)
     }
 
     pub fn begin_frame(&mut self) {
@@ -498,13 +476,8 @@ impl Renderer {
         TextureHandle(self.textures.len() - 1)
     }
 
-    pub fn re_create_texture(
-        &mut self,
-        desc: TextureDescriptor,
-        handle: TextureHandle,
-    ) -> TextureHandle {
+    pub fn re_create_texture(&mut self, desc: TextureDescriptor, handle: TextureHandle) {
         self.create_texture_at(desc, handle);
-        TextureHandle(self.textures.len() - 1)
     }
 
     pub fn present(&mut self) {
@@ -549,13 +522,24 @@ pub trait RenderPass<'renderer> {
         shader: ShaderHandle,
     ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
 
-    fn with_depth(self: Box<Self>, value: f32) -> Box<dyn RenderPass<'renderer> + 'renderer>;
+    fn with_depth(
+        self: Box<Self>,
+        texture: TextureHandle,
+        value: Option<f32>,
+    ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
 
     fn with_clear_color(
         self: Box<Self>,
         r: f32,
         g: f32,
         b: f32,
+    ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
+
+    //  None for resolve target means use canvas
+    fn with_target_texture_resolve(
+        self: Box<Self>,
+        target: TextureHandle,
+        resolve: Option<TextureHandle>,
     ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
 }
 

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     core::{
         object::Renderable,
-        renderer::{RenderPass, Renderer, ShaderHandle, UntypedBindGroupHandle},
+        renderer::{RenderPass, Renderer, ShaderHandle, TextureHandle, UntypedBindGroupHandle},
     },
     types::Vec3,
 };
@@ -15,6 +15,9 @@ pub struct WGPURenderPass<'renderer> {
     bind_groups: HashMap<u32, UntypedBindGroupHandle>,
     clear_color: Option<Vec3>,
     depth: Option<f32>,
+    depth_tex: Option<TextureHandle>,
+    target: Option<TextureHandle>,
+    resolve_target: Option<TextureHandle>,
 }
 
 impl<'renderer> WGPURenderPass<'renderer> {
@@ -32,6 +35,9 @@ impl<'renderer> WGPURenderPass<'renderer> {
             bind_groups: HashMap::new(),
             clear_color: None,
             depth: None,
+            depth_tex: None,
+            target: None,
+            resolve_target: None,
         }
     }
 }
@@ -56,11 +62,39 @@ impl<'renderer> RenderPass<'renderer> for WGPURenderPass<'renderer> {
         if range.start + range.len() as u32 > renderable.num_instances() {
             range.end = renderable.num_instances();
         }
+
+        let (view, resolve_target) = if let Some(tex) = self.target {
+            let view = &self.renderer.textures[tex.0].view;
+            let resolve_target = Some(
+                self.resolve_target
+                    .map(|tex| &self.renderer.textures[tex.0].view)
+                    .unwrap_or(&self.renderer.surface_data.as_ref().unwrap().1),
+            );
+            (view, resolve_target)
+        } else {
+            (&self.renderer.surface_data.as_ref().unwrap().1, None)
+        };
+
+        let depth_stencil_attachment =
+            self.depth_tex
+                .map(|tex| wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.renderer.textures[tex.0].view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: if let Some(depth) = self.depth {
+                            wgpu::LoadOp::Clear(depth)
+                        } else {
+                            wgpu::LoadOp::Load
+                        },
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                });
+
         let mut render_pass = self.encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &self.renderer.surface_data.as_ref().unwrap().1,
-                resolve_target: None,
+                view,
+                resolve_target,
                 ops: wgpu::Operations {
                     load: if let Some(color) = self.clear_color {
                         wgpu::LoadOp::Clear(wgpu::Color {
@@ -75,18 +109,7 @@ impl<'renderer> RenderPass<'renderer> for WGPURenderPass<'renderer> {
                     ..Default::default()
                 },
             })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: &self.renderer.textures[self.renderer.depth_texture.0].view,
-                depth_ops: Some(wgpu::Operations {
-                    load: if let Some(depth) = self.depth {
-                        wgpu::LoadOp::Clear(depth)
-                    } else {
-                        wgpu::LoadOp::Load
-                    },
-                    store: wgpu::StoreOp::Store,
-                }),
-                stencil_ops: None,
-            }),
+            depth_stencil_attachment,
             occlusion_query_set: None,
             timestamp_writes: None,
         });
@@ -154,8 +177,13 @@ impl<'renderer> RenderPass<'renderer> for WGPURenderPass<'renderer> {
         self
     }
 
-    fn with_depth(mut self: Box<Self>, value: f32) -> Box<dyn RenderPass<'renderer> + 'renderer> {
-        self.depth = Some(value);
+    fn with_depth(
+        mut self: Box<Self>,
+        handle: TextureHandle,
+        value: Option<f32>,
+    ) -> Box<dyn RenderPass<'renderer> + 'renderer> {
+        self.depth_tex = Some(handle);
+        self.depth = value;
         self
     }
 
@@ -171,6 +199,16 @@ impl<'renderer> RenderPass<'renderer> for WGPURenderPass<'renderer> {
 
     fn unbind(mut self: Box<Self>, slot: u32) -> Box<dyn RenderPass<'renderer> + 'renderer> {
         self.bind_groups.remove(&slot);
+        self
+    }
+
+    fn with_target_texture_resolve(
+        mut self: Box<Self>,
+        target: TextureHandle,
+        resolve: Option<TextureHandle>,
+    ) -> Box<dyn RenderPass<'renderer> + 'renderer> {
+        self.target = Some(target);
+        self.resolve_target = resolve;
         self
     }
 }

@@ -30,7 +30,7 @@ impl Default for TextureDescriptor {
             address_mode: wgpu::AddressMode::ClampToEdge,
             size: UVec2::new(0, 0),
             sample_count: 1,
-            format: wgpu::TextureFormat::Rgba16Unorm,
+            format: wgpu::TextureFormat::Bgra8UnormSrgb,
         }
     }
 }
