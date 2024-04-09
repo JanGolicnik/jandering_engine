@@ -1,4 +1,5 @@
 use grass_object::GrassObject;
+use image::GenericImageView;
 use jandering_engine::{
     core::{
         bind_group::{
@@ -10,7 +11,7 @@ use jandering_engine::{
         object::{Instance, Object, Vertex},
         renderer::{BindGroupHandle, BufferHandle, Renderer, ShaderHandle, TextureHandle},
         shader::ShaderDescriptor,
-        texture::{Texture, TextureDescriptor},
+        texture::{sampler::SamplerDescriptor, texture_usage, TextureDescriptor, TextureFormat},
         window::{InputState, Key, MouseButton, WindowBuilder, WindowEvent},
     },
     types::Vec3,
@@ -90,7 +91,6 @@ impl Application {
 
         let render_data = engine.renderer.create_bind_group(render_data);
 
-        // let grass =
         let grass_lod1 = GrassObject::from_text(
             include_str!("grass_lod1.obj"),
             &mut engine.renderer,
@@ -108,23 +108,30 @@ impl Application {
             vec![Instance::default().scale(1000.0)],
         );
 
-        let heightmap_handle = engine.renderer.add_texture(Texture::from_bytes(
-            &engine.renderer,
-            include_bytes!("heightmap.jpg"),
-            TextureDescriptor::default(),
-        ));
-        let heightmap_texture = TextureBindGroup::new(&mut engine.renderer, heightmap_handle);
+        let tex_sampler = engine.renderer.create_sampler(SamplerDescriptor {
+            address_mode:
+                jandering_engine::core::texture::sampler::SamplerAddressMode::RepeatMirrored,
+            ..Default::default()
+        });
+
+        let heightmap_image = image::load_from_memory(include_bytes!("heightmap.jpg")).unwrap();
+        let heightmap_handle = engine.renderer.create_texture(TextureDescriptor {
+            data: Some(&heightmap_image.to_rgba8()),
+            size: heightmap_image.dimensions().into(),
+            ..Default::default()
+        });
+        let heightmap_texture =
+            TextureBindGroup::new(&mut engine.renderer, heightmap_handle, tex_sampler);
         let heightmap_texture = engine.renderer.create_bind_group(heightmap_texture);
 
-        let noise_handle = engine.renderer.add_texture(Texture::from_bytes(
-            &engine.renderer,
-            include_bytes!("bignoise.png"),
-            TextureDescriptor {
-                address_mode: wgpu::AddressMode::Repeat,
-                ..Default::default()
-            },
-        ));
-        let noise_texture = TextureBindGroup::new(&mut engine.renderer, noise_handle);
+        let noise_image = image::load_from_memory(include_bytes!("bignoise.png")).unwrap();
+        let noise_handle = engine.renderer.create_texture(TextureDescriptor {
+            data: Some(&noise_image.to_rgba8()),
+            size: noise_image.dimensions().into(),
+            address_mode: wgpu::AddressMode::Repeat,
+            ..Default::default()
+        });
+        let noise_texture = TextureBindGroup::new(&mut engine.renderer, noise_handle, tex_sampler);
         let noise_texture = engine.renderer.create_bind_group(noise_texture);
 
         let multisample_texture = engine.renderer.create_texture(TextureDescriptor {
@@ -136,7 +143,8 @@ impl Application {
         let depth_texture = engine.renderer.create_texture(TextureDescriptor {
             size: engine.renderer.size(),
             sample_count: MULTISAMPLE,
-            format: wgpu::TextureFormat::Depth32Float,
+            format: TextureFormat::Depth32F,
+            usage: texture_usage::TARGET | texture_usage::BIND,
             ..Default::default()
         });
 
@@ -239,7 +247,7 @@ impl EventHandler for Application {
             context.renderer.re_create_texture(
                 TextureDescriptor {
                     size: context.renderer.size(),
-                    format: wgpu::TextureFormat::Depth32Float,
+                    format: TextureFormat::Depth32F,
                     sample_count: MULTISAMPLE,
                     ..Default::default()
                 },
@@ -292,23 +300,6 @@ impl EventHandler for Application {
             .render(&[&self.grass_lod1])
             .submit();
     }
-}
-
-fn main() {
-    let mut engine = EngineBuilder::default()
-        .with_window(
-            WindowBuilder::default()
-                .with_cursor(true)
-                .with_resolution(1000, 1000)
-                .with_title("heyy")
-                .with_cursor(false),
-        )
-        .with_clear_color(0.9, 0.8, 0.7)
-        .build();
-
-    let app = pollster::block_on(Application::new(&mut engine));
-
-    engine.run(app);
 }
 
 #[repr(C)]
@@ -380,4 +371,26 @@ impl RenderDataBindGroup {
             buffer_handle,
         }
     }
+}
+
+fn main() {
+    // let mut input = String::new();
+    // std::io::stdin()
+    //     .read_line(&mut input)
+    //     .expect("error: unable to read user input");
+
+    let mut engine = EngineBuilder::default()
+        .with_window(
+            WindowBuilder::default()
+                .with_cursor(true)
+                .with_resolution(1920, 1080)
+                .with_title("Grass")
+                .with_cursor(false),
+        )
+        .with_clear_color(0.9, 0.8, 0.7)
+        .build();
+
+    let app = pollster::block_on(Application::new(&mut engine));
+
+    engine.run(app);
 }

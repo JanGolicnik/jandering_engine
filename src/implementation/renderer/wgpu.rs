@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use crate::{
     core::{
         object::Renderable,
-        renderer::{RenderPass, Renderer, ShaderHandle, TextureHandle, UntypedBindGroupHandle},
+        renderer::{
+            render_pass::RenderPass, Renderer, ShaderHandle, TextureHandle, UntypedBindGroupHandle,
+        },
     },
     types::Vec3,
 };

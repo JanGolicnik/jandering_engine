@@ -13,7 +13,15 @@ struct RenderData {
     grass_height: f32,
     grass_height_variation: f32,
     wind_strength: f32,
+    wind_scale: f32,
+    wind_speed: f32,
+    wind_direction: f32,
+    wind_noise_scale: f32,
+    wind_noise_strength: f32,
     sqrt_n_grass: u32,
+    terrain_size: f32,
+    render_square_size: f32,
+    fov_x: f32,
 };
 
 @group(1) @binding(0)
@@ -45,8 +53,9 @@ struct VertexInput{
 
 struct VertexOutput{
     @builtin(position) clip_position: vec4<f32>,
-    @location(1) normal: vec3<f32>,
     @location(0) uv: vec2<f32>,
+    @location(1) normal: vec3<f32>,
+    @location(2) world_pos: vec3<f32>,
 };
 
 @vertex
@@ -73,6 +82,7 @@ fn vs_main(
     out.clip_position = camera.view_proj * vec4<f32>(pos, 1.0);
     out.normal = normalize(model.normal);
     out.uv = model.uv;
+    out.world_pos = pos;
     
     return out;
 }
@@ -80,7 +90,10 @@ fn vs_main(
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32>{
-    return vec4<f32>(render_data.ground_color * 1.1, 1.0);
+    let dist = 1.0 - abs(camera.view_pos.xz - in.world_pos.xz) / (render_data.terrain_size * 0.5);
+    let alpha = min(dist.x, dist.y);
+
+    return vec4<f32>(render_data.ground_color * 1.1, alpha);
     // return vec4<f32>(1.0);
 }
 

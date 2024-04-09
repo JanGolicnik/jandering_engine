@@ -7,7 +7,7 @@ use jandering_engine::{
         object::{Instance, Object, Vertex},
         renderer::{BindGroupHandle, Renderer, ShaderHandle, TextureHandle},
         shader::ShaderDescriptor,
-        texture::TextureDescriptor,
+        texture::{TextureDescriptor, TextureFormat},
         window::{InputState, Key, MouseButton, WindowBuilder, WindowEvent},
     },
     types::{Vec3, DEG_TO_RAD},
@@ -79,7 +79,7 @@ impl Application {
 
         let depth_texture = engine.renderer.create_texture(TextureDescriptor {
             size: engine.renderer.size(),
-            format: wgpu::TextureFormat::Depth32Float,
+            format: TextureFormat::Depth32F,
             ..Default::default()
         });
 

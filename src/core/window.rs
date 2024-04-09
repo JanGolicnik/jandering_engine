@@ -194,6 +194,7 @@ pub enum WindowEvent {
     },
     RedrawRequested,
     CloseRequested,
+    EventsCleared,
 }
 
 pub struct WindowBuilder {

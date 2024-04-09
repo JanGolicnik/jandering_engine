@@ -43,8 +43,10 @@ impl WindowEventHandler for Engine {
     fn on_event(&mut self, event: WindowEvent, window: &mut dyn Window) {
         match event {
             WindowEvent::Resized((width, height)) => {
-                window.resize(width, height);
-                self.renderer.resize(width, height);
+                if window.size() != (width, height) {
+                    window.resize(width, height);
+                    self.renderer.resize(width, height);
+                }
                 self.events.push(event);
             }
             WindowEvent::RedrawRequested => {
@@ -64,11 +66,12 @@ impl WindowEventHandler for Engine {
 
                 self.renderer.present();
 
-                window.request_redraw();
-
                 self.events.clear();
             }
             WindowEvent::CloseRequested => window.close(),
+            WindowEvent::EventsCleared => {
+                window.request_redraw();
+            }
             _ => self.events.push(event),
         }
     }

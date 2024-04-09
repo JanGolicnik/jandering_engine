@@ -1,6 +1,6 @@
 use std::any::Any;
 
-use super::renderer::{BufferHandle, Renderer, TextureHandle};
+use super::renderer::{BufferHandle, Renderer, SamplerHandle, TextureHandle};
 
 pub mod camera;
 pub mod resolution;
@@ -29,7 +29,7 @@ impl<T: 'static> BindGroupToAny for T {
 pub enum BindGroupLayoutEntry {
     Data(BufferHandle),
     Texture(TextureHandle),
-    Sampler(TextureHandle),
+    Sampler(SamplerHandle),
 }
 
 #[derive(Clone)]

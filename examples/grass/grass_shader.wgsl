@@ -119,14 +119,18 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32>{
 
     return vec4<f32>(color.r, color.g, color.b * noise, alpha * 0.9);
 
+    ///////// ALPHA //////// 
     // return vec4<f32>(color.r, color.g, color.b * noise, 0.5);
-  
+    // return vec4<f32>(alpha * 0.9);
+
+    ///////// WIND //////// 
     // let instance_index = in.index;
     // let coords = vec2<f32>(f32(instance_index % render_data.sqrt_n_grass), f32(instance_index / render_data.sqrt_n_grass)) / f32(render_data.sqrt_n_grass);
-    // return vec4<f32>(alpha * 0.9);
-    // let wind = calculate_wind(normalized_pos);
+    // let wind = calculate_wind(in.terrain_pos_t);
     // return vec4<f32>(vec3<f32>(wind), 1.0);
 
+
+    //////// RANDOM //////// 
     // let grid_pos = vec2<u32>(instance_index % render_data.sqrt_n_grass, instance_index / render_data.sqrt_n_grass); 
     // let i = grid_pos.x + grid_pos.y * render_data.sqrt_n_grass;
     // let t = f32(instance_index) / f32(render_data.sqrt_n_grass * render_data.sqrt_n_grass);

@@ -1,7 +1,7 @@
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
-    event::{KeyEvent, MouseButton, MouseScrollDelta, WindowEvent},
+    event::{KeyEvent, MouseButton, MouseScrollDelta, StartCause, WindowEvent},
     keyboard::PhysicalKey,
     window::UserAttentionType,
 };
@@ -11,8 +11,10 @@ use crate::core::window::{Window, WindowBuilder, WindowEventHandler};
 pub struct WinitWindow {
     event_loop: Option<winit::event_loop::EventLoop<()>>,
     window: winit::window::Window,
-    ignore_next_resize: bool, // to avoid feedback loops
     should_close: bool,
+    ignore_next_resize: bool,
+    is_init: bool,
+    size: (u32, u32),
 }
 
 impl WinitWindow {
@@ -48,18 +50,20 @@ impl WinitWindow {
         Self {
             event_loop: Some(event_loop),
             window,
-            ignore_next_resize: false,
             should_close: false,
+            is_init: true,
+            ignore_next_resize: false,
+            size: (builder.width, builder.height),
         }
     }
 }
 
 impl Window for WinitWindow {
     fn resize(&mut self, width: u32, height: u32) {
-        let _ = self
+        self.ignore_next_resize = self
             .window
-            .request_inner_size(PhysicalSize::new(width, height));
-        self.ignore_next_resize = true;
+            .request_inner_size(PhysicalSize::new(width, height))
+            .is_none();
     }
 
     fn set_cursor_position(&self, x: u32, y: u32) {
@@ -67,18 +71,15 @@ impl Window for WinitWindow {
     }
 
     fn size(&self) -> (u32, u32) {
-        let size = self.window.inner_size();
-        (size.width, size.height)
+        self.size
     }
 
     fn width(&self) -> u32 {
-        let size = self.window.inner_size();
-        size.width
+        self.size.0
     }
 
     fn height(&self) -> u32 {
-        let size = self.window.inner_size();
-        size.height
+        self.size.1
     }
 
     fn request_redraw(&mut self) {
@@ -107,11 +108,22 @@ impl Window for WinitWindow {
                 if target.exiting() {
                     return;
                 }
-                if let winit::event::Event::WindowEvent { window_id, event } = e {
-                    if window_id == self.window.id() {
+
+                if !matches!(target.control_flow(), winit::event_loop::ControlFlow::Poll) {
+                    target.set_control_flow(winit::event_loop::ControlFlow::Poll);
+                }
+
+                match e {
+                    winit::event::Event::WindowEvent { window_id, event } => {
+                        if window_id != self.window.id() {
+                            return;
+                        }
+
                         let event = match event {
                             WindowEvent::Resized(size) => {
-                                if self.ignore_next_resize {
+                                dbg!(event);
+                                if self.is_init {
+                                    self.ignore_next_resize = false;
                                     return;
                                 }
                                 crate::core::window::WindowEvent::Resized((size.width, size.height))
@@ -177,13 +189,24 @@ impl Window for WinitWindow {
                                 }
                             }
                             WindowEvent::RedrawRequested => {
+                                dbg!(event);
                                 crate::core::window::WindowEvent::RedrawRequested
                             }
-                            _ => return,
+                            _ => {
+                                return;
+                            }
                         };
-
-                        event_handler.on_event(event, self)
+                        event_handler.on_event(event, self);
                     }
+                    winit::event::Event::NewEvents(cause) => {
+                        self.is_init = cause == StartCause::Init;
+                    }
+                    winit::event::Event::AboutToWait => {
+                        dbg!(e);
+                        event_handler
+                            .on_event(crate::core::window::WindowEvent::EventsCleared, self);
+                    }
+                    _ => {}
                 }
             })
             .unwrap();
