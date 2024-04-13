@@ -7,7 +7,7 @@ pub mod resolution;
 pub mod texture;
 pub trait BindGroup: Any + BindGroupToAny {
     fn get_data(&self) -> Box<[u8]>;
-    fn get_layout(&self, renderer: &mut Renderer) -> BindGroupLayout;
+    fn get_layout(&self, renderer: &mut dyn Renderer) -> BindGroupLayout;
 }
 
 pub trait BindGroupToAny {

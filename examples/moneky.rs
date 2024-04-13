@@ -5,7 +5,10 @@ use jandering_engine::{
         engine::{Engine, EngineBuilder, EngineContext},
         event_handler::EventHandler,
         object::{Instance, Object, Vertex},
-        renderer::{BindGroupHandle, Renderer, ShaderHandle, TextureHandle},
+        renderer::{
+            create_typed_bind_group, get_typed_bind_group, get_typed_bind_group_mut,
+            BindGroupHandle, Renderer, ShaderHandle, TextureHandle,
+        },
         shader::ShaderDescriptor,
         texture::{TextureDescriptor, TextureFormat},
         window::{InputState, Key, MouseButton, WindowBuilder, WindowEvent},
@@ -28,9 +31,8 @@ struct Application {
 
 impl Application {
     pub async fn new(engine: &mut Engine) -> Self {
-        let camera = engine
-            .renderer
-            .create_bind_group(FreeCameraBindGroup::default());
+        let camera =
+            create_typed_bind_group(engine.renderer.as_mut(), FreeCameraBindGroup::default());
 
         let shader = engine.renderer.create_shader(
             ShaderDescriptor::default()
@@ -65,13 +67,13 @@ impl Application {
 
         let susane = Object::from_obj(
             include_str!("moneky/susane.obj"),
-            &mut engine.renderer,
+            engine.renderer.as_mut(),
             susane_instances,
         );
 
         let ground = Object::from_obj(
             include_str!("moneky/ground.obj"),
-            &mut engine.renderer,
+            engine.renderer.as_mut(),
             vec![Instance::default()
                 .translate(Vec3::new(0.0, -5.0, 0.0))
                 .scale(0.05)],
@@ -105,7 +107,7 @@ impl EventHandler for Application {
 
         if self.is_in_fps {
             let resolution = context.renderer.size();
-            let camera = context.renderer.get_bind_group_t_mut(self.camera).unwrap();
+            let camera = get_typed_bind_group_mut(context.renderer.as_mut(), self.camera).unwrap();
             camera.update(context.events, context.window, resolution, dt);
 
             if context.events.iter().any(|e| {
@@ -139,11 +141,11 @@ impl EventHandler for Application {
             *e = e.translate(Vec3::new(0.0, self.time.sin() * t * 10.0, 0.0));
         });
 
-        self.susane.update(context.renderer);
+        self.susane.update(context.renderer.as_mut());
     }
 
-    fn on_render(&mut self, renderer: &mut Box<Renderer>) {
-        let camera = renderer.get_bind_group_t(self.camera).unwrap();
+    fn on_render(&mut self, renderer: &mut Box<dyn Renderer>) {
+        let camera = get_typed_bind_group(renderer.as_ref(), self.camera).unwrap();
         renderer.write_bind_group(self.camera.into(), &camera.get_data());
 
         renderer

@@ -1,9 +1,5 @@
 use super::bind_group::BindGroupLayout;
 
-pub struct Shader {
-    pub pipeline: wgpu::RenderPipeline,
-}
-
 pub struct ShaderDescriptor<'a> {
     pub code: &'a str,
     pub descriptors: &'a [wgpu::VertexBufferLayout<'a>], //TODO: abstract this away so there is no dependency on wgpu

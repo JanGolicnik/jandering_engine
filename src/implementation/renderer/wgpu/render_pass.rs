@@ -1,17 +1,17 @@
-use std::collections::HashMap;
-
 use crate::{
     core::{
         object::Renderable,
-        renderer::{
-            render_pass::RenderPass, Renderer, ShaderHandle, TextureHandle, UntypedBindGroupHandle,
-        },
+        renderer::{RenderPass, ShaderHandle, TextureHandle, UntypedBindGroupHandle},
     },
     types::Vec3,
 };
 
+use std::collections::HashMap;
+
+use super::WGPURenderer;
+
 pub struct WGPURenderPass<'renderer> {
-    renderer: &'renderer mut Renderer,
+    renderer: &'renderer mut WGPURenderer,
     encoder: wgpu::CommandEncoder,
     shader: ShaderHandle,
     bind_groups: HashMap<u32, UntypedBindGroupHandle>,
@@ -23,7 +23,7 @@ pub struct WGPURenderPass<'renderer> {
 }
 
 impl<'renderer> WGPURenderPass<'renderer> {
-    pub fn new(renderer: &'renderer mut Renderer) -> Self {
+    pub fn new(renderer: &'renderer mut WGPURenderer) -> Self {
         let encoder = renderer
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {

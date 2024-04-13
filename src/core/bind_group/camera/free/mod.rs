@@ -60,7 +60,7 @@ impl BindGroup for FreeCameraBindGroup {
         bytemuck::cast_slice(&[self.data]).into()
     }
 
-    fn get_layout(&self, renderer: &mut Renderer) -> BindGroupLayout {
+    fn get_layout(&self, renderer: &mut dyn Renderer) -> BindGroupLayout {
         let buffer_handle = renderer.create_uniform_buffer(&self.get_data());
         BindGroupLayout {
             entries: vec![BindGroupLayoutEntry::Data(buffer_handle)],

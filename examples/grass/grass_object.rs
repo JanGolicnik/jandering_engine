@@ -19,7 +19,7 @@ pub struct GrassObject {
 }
 
 impl GrassObject {
-    pub fn from_text(data: &str, renderer: &mut Renderer, n_instances: u32) -> GrassObject {
+    pub fn from_text(data: &str, renderer: &mut dyn Renderer, n_instances: u32) -> GrassObject {
         let (vertices, indices) = load_obj(data);
 
         let vertex_buffer = renderer.create_vertex_buffer(bytemuck::cast_slice(&vertices));

@@ -1,4 +1,4 @@
-use crate::implementation::window::winit::WinitWindow;
+use crate::implementation::{renderer::wgpu::WGPURenderer, window::winit::WinitWindow};
 
 use super::{
     event_handler::EventHandler,
@@ -9,14 +9,14 @@ use super::{
 pub struct Engine {
     pub events: Vec<WindowEvent>,
     pub window: Option<Box<dyn Window>>,
-    pub renderer: Box<Renderer>,
+    pub renderer: Box<dyn Renderer>,
     event_handler: Option<Box<dyn EventHandler>>,
 }
 
 impl Engine {
     pub fn new(builder: EngineBuilder) -> Self {
         let window: Box<dyn Window> = Box::new(WinitWindow::new(builder.window_builder));
-        let renderer = pollster::block_on(Renderer::new(&window));
+        let renderer = pollster::block_on(WGPURenderer::new(&window));
 
         Self {
             events: Vec::new(),
@@ -36,7 +36,7 @@ impl Engine {
 pub struct EngineContext<'a> {
     pub events: &'a Vec<WindowEvent>,
     pub window: &'a mut dyn Window,
-    pub renderer: &'a mut Box<Renderer>,
+    pub renderer: &'a mut Box<dyn Renderer>,
 }
 
 impl WindowEventHandler for Engine {

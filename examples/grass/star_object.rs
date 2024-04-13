@@ -16,7 +16,7 @@ pub struct StarObject {
 }
 
 impl StarObject {
-    pub fn new(renderer: &mut Renderer, n_instances: u32) -> Self {
+    pub fn new(renderer: &mut dyn Renderer, n_instances: u32) -> Self {
         let (vertices, indices) = triangle_data();
 
         let vertex_buffer = renderer.create_vertex_buffer(bytemuck::cast_slice(&vertices));

@@ -9,7 +9,10 @@ use jandering_engine::{
         engine::{Engine, EngineBuilder, EngineContext},
         event_handler::EventHandler,
         object::{Instance, Object, Vertex},
-        renderer::{BindGroupHandle, BufferHandle, Renderer, ShaderHandle, TextureHandle},
+        renderer::{
+            create_typed_bind_group, get_typed_bind_group, get_typed_bind_group_mut,
+            BindGroupHandle, BufferHandle, Renderer, ShaderHandle, TextureHandle,
+        },
         shader::ShaderDescriptor,
         texture::{sampler::SamplerDescriptor, texture_usage, TextureDescriptor, TextureFormat},
         window::{InputState, Key, MouseButton, WindowBuilder, WindowEvent},
@@ -63,12 +66,10 @@ const MULTISAMPLE: u32 = 4;
 
 impl Application {
     pub async fn new(engine: &mut Engine) -> Self {
-        let camera = engine
-            .renderer
-            .create_bind_group(FreeCameraBindGroup::default());
-
-        let render_data = RenderDataBindGroup::new(&mut engine.renderer);
-        let render_data_bind_group_layout = render_data.get_layout(&mut engine.renderer);
+        let camera =
+            create_typed_bind_group(engine.renderer.as_mut(), FreeCameraBindGroup::default());
+        let render_data = RenderDataBindGroup::new(engine.renderer.as_mut());
+        let render_data_bind_group_layout = render_data.get_layout(engine.renderer.as_mut());
 
         let grass_shader = engine.renderer.create_shader(
             ShaderDescriptor::default()
@@ -116,27 +117,27 @@ impl Application {
                 .with_source(include_str!("star_shader.wgsl")),
         );
 
-        let render_data = engine.renderer.create_bind_group(render_data);
+        let render_data = create_typed_bind_group(engine.renderer.as_mut(), render_data);
 
         let grass_lod1 = GrassObject::from_text(
             include_str!("grass_lod1.obj"),
-            &mut engine.renderer,
+            engine.renderer.as_mut(),
             GRASS_LOD1_N,
         );
         let grass_lod2 = GrassObject::from_text(
             include_str!("grass_lod2.obj"),
-            &mut engine.renderer,
+            engine.renderer.as_mut(),
             GRASS_LOD2_N,
         );
 
         let ground = Object::from_obj(
             include_str!("plane.obj"),
             // include_str!("grass_lod1.obj"),
-            &mut engine.renderer,
+            engine.renderer.as_mut(),
             vec![Instance::default().scale(1000.0)],
         );
 
-        let star_triangle = StarObject::new(&mut engine.renderer, STAR_COUNT);
+        let star_triangle = StarObject::new(engine.renderer.as_mut(), STAR_COUNT);
 
         let tex_sampler = engine.renderer.create_sampler(SamplerDescriptor {
             address_mode:
@@ -151,8 +152,9 @@ impl Application {
             ..Default::default()
         });
         let heightmap_texture =
-            TextureBindGroup::new(&mut engine.renderer, heightmap_handle, tex_sampler);
-        let heightmap_texture = engine.renderer.create_bind_group(heightmap_texture);
+            TextureBindGroup::new(engine.renderer.as_mut(), heightmap_handle, tex_sampler);
+        let heightmap_texture =
+            create_typed_bind_group(engine.renderer.as_mut(), heightmap_texture);
 
         let noise_image = image::load_from_memory(include_bytes!("bignoise.png")).unwrap();
         let noise_handle = engine.renderer.create_texture(TextureDescriptor {
@@ -161,8 +163,9 @@ impl Application {
             address_mode: wgpu::AddressMode::Repeat,
             ..Default::default()
         });
-        let noise_texture = TextureBindGroup::new(&mut engine.renderer, noise_handle, tex_sampler);
-        let noise_texture = engine.renderer.create_bind_group(noise_texture);
+        let noise_texture =
+            TextureBindGroup::new(engine.renderer.as_mut(), noise_handle, tex_sampler);
+        let noise_texture = create_typed_bind_group(engine.renderer.as_mut(), noise_texture);
 
         let multisample_texture = engine.renderer.create_texture(TextureDescriptor {
             size: engine.renderer.size(),
@@ -200,19 +203,19 @@ impl Application {
         }
     }
 
-    fn setup_grass_lod1(&mut self, renderer: &mut Box<Renderer>) {
-        let render_data = renderer.get_bind_group_t_mut(self.render_data).unwrap();
+    fn setup_grass_lod1(&mut self, renderer: &mut Box<dyn Renderer>) {
+        let render_data = get_typed_bind_group_mut(renderer.as_mut(), self.render_data).unwrap();
         render_data.data.sqrt_n_grass = (GRASS_LOD1_N as f32).sqrt() as u32;
         render_data.data.render_square_size = GRASS_LOD1_SIDE;
-        let render_data = renderer.get_bind_group_t(self.render_data).unwrap();
+        let render_data = get_typed_bind_group(renderer.as_ref(), self.render_data).unwrap();
         renderer.write_bind_group(self.render_data.into(), &render_data.get_data());
     }
 
-    fn setup_grass_lod2(&mut self, renderer: &mut Box<Renderer>) {
-        let render_data = renderer.get_bind_group_t_mut(self.render_data).unwrap();
+    fn setup_grass_lod2(&mut self, renderer: &mut Box<dyn Renderer>) {
+        let render_data = get_typed_bind_group_mut(renderer.as_mut(), self.render_data).unwrap();
         render_data.data.sqrt_n_grass = (GRASS_LOD2_N as f32).sqrt() as u32;
         render_data.data.render_square_size = GRASS_LOD2_SIDE;
-        let render_data = renderer.get_bind_group_t(self.render_data).unwrap();
+        let render_data = get_typed_bind_group(renderer.as_ref(), self.render_data).unwrap();
         renderer.write_bind_group(self.render_data.into(), &render_data.get_data());
     }
 }
@@ -235,15 +238,13 @@ impl EventHandler for Application {
             self.fps_counter = 0;
         }
 
-        let render_data = context
-            .renderer
-            .get_bind_group_t_mut(self.render_data)
-            .unwrap();
+        let render_data =
+            get_typed_bind_group_mut(context.renderer.as_mut(), self.render_data).unwrap();
         render_data.data.time += dt;
 
         if self.is_in_fps {
             let resolution = context.renderer.size();
-            let camera = context.renderer.get_bind_group_t_mut(self.camera).unwrap();
+            let camera = get_typed_bind_group_mut(context.renderer.as_mut(), self.camera).unwrap();
             camera.update(context.events, context.window, resolution, dt);
 
             if context.events.iter().any(|e| {
@@ -297,12 +298,11 @@ impl EventHandler for Application {
         }
     }
 
-    fn on_render(&mut self, renderer: &mut Box<Renderer>) {
-        let camera = renderer.get_bind_group_t(self.camera).unwrap();
+    fn on_render(&mut self, renderer: &mut Box<dyn Renderer>) {
+        let camera = get_typed_bind_group(renderer.as_ref(), self.camera).unwrap();
         renderer.write_bind_group(self.camera.into(), &camera.get_data());
 
-        let sky_color = renderer
-            .get_bind_group_t(self.render_data)
+        let sky_color = get_typed_bind_group(renderer.as_ref(), self.render_data)
             .unwrap()
             .data
             .sky_color;
@@ -376,7 +376,7 @@ impl BindGroup for RenderDataBindGroup {
         bytemuck::cast_slice(&[self.data]).into()
     }
 
-    fn get_layout(&self, _renderer: &mut Renderer) -> BindGroupLayout {
+    fn get_layout(&self, _renderer: &mut dyn Renderer) -> BindGroupLayout {
         BindGroupLayout {
             entries: vec![BindGroupLayoutEntry::Data(self.buffer_handle)],
         }
@@ -384,7 +384,7 @@ impl BindGroup for RenderDataBindGroup {
 }
 
 impl RenderDataBindGroup {
-    fn new(renderer: &mut Renderer) -> Self {
+    fn new(renderer: &mut dyn Renderer) -> Self {
         let data = RenderDataData {
             time: 0.0,
             ground_color: Vec3::new(0.1, 0.4, 0.2),

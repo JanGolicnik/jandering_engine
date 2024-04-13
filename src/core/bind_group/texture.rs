@@ -12,7 +12,7 @@ impl BindGroup for TextureBindGroup {
         Box::new([])
     }
 
-    fn get_layout(&self, _renderer: &mut Renderer) -> BindGroupLayout {
+    fn get_layout(&self, _renderer: &mut dyn Renderer) -> BindGroupLayout {
         BindGroupLayout {
             entries: vec![
                 BindGroupLayoutEntry::Texture(self.texture_handle),
@@ -24,7 +24,7 @@ impl BindGroup for TextureBindGroup {
 
 impl TextureBindGroup {
     pub fn new(
-        _renderer: &mut Renderer,
+        _renderer: &mut dyn Renderer,
         texture_handle: TextureHandle,
         sampler_handle: SamplerHandle,
     ) -> Self {

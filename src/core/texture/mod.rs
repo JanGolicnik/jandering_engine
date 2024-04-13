@@ -5,8 +5,8 @@ pub mod sampler;
 pub struct Texture {
     pub texture: wgpu::Texture,
     pub(crate) view: wgpu::TextureView,
-    pub(crate) width: u32,
-    pub(crate) height: u32,
+    pub width: u32,
+    pub height: u32,
 }
 
 pub enum TextureFormat {
@@ -45,15 +45,5 @@ impl<'data> Default for TextureDescriptor<'data> {
             data: None,
             usage: texture_usage::BIND | texture_usage::COPY_TARGET,
         }
-    }
-}
-
-impl Texture {
-    pub fn width(&self) -> u32 {
-        self.width
-    }
-
-    pub fn height(&self) -> u32 {
-        self.height
     }
 }

@@ -20,7 +20,7 @@ impl BindGroup for ResolutionBindGroup {
         bytemuck::cast_slice(&[self.data]).into()
     }
 
-    fn get_layout(&self, renderer: &mut Renderer) -> BindGroupLayout {
+    fn get_layout(&self, renderer: &mut dyn Renderer) -> BindGroupLayout {
         let buffer_handle = renderer.create_uniform_buffer(&self.get_data());
         BindGroupLayout {
             entries: vec![BindGroupLayoutEntry::Data(buffer_handle)],
@@ -29,7 +29,7 @@ impl BindGroup for ResolutionBindGroup {
 }
 
 impl ResolutionBindGroup {
-    pub fn new(renderer: &Renderer) -> Self {
+    pub fn new(renderer: &dyn Renderer) -> Self {
         Self {
             data: ResolutionBindGroupData {
                 resolution: [renderer.size().x, renderer.size().y],
