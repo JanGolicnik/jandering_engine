@@ -14,6 +14,8 @@ pub mod constants;
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CameraData {
+    up: [f32; 4],
+    right: [f32; 4],
     view_position: [f32; 4],
     view_proj: [[f32; 4]; 4],
 }
@@ -69,6 +71,8 @@ impl BindGroup for FreeCameraBindGroup {
 impl Default for FreeCameraBindGroup {
     fn default() -> Self {
         let data = CameraData {
+            up: [0.0; 4],
+            right: [0.0; 4],
             view_position: [0.0; 4],
             view_proj: Mat4::IDENTITY.to_cols_array_2d(),
         };
@@ -115,6 +119,12 @@ impl FreeCameraBindGroup {
             fov,
             ..
         } = &self.perspective;
+
+        let right = CAMERA_UP.cross(*direction).normalize();
+        self.data.right = [right.x, right.y, right.z, 0.0];
+
+        let up = direction.cross(right).normalize();
+        self.data.up = [up.x, up.y, up.z, 0.0];
 
         self.data.view_proj = {
             let view = Mat4::look_at_rh(*position, *position + *direction, CAMERA_UP);

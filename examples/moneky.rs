@@ -166,7 +166,6 @@ fn main() {
                 .with_title("heyy")
                 .with_cursor(false),
         )
-        .with_clear_color(0.9, 0.8, 0.7)
         .build();
 
     let app = pollster::block_on(Application::new(&mut engine));

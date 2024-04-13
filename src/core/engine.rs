@@ -1,4 +1,4 @@
-use crate::{implementation::window::winit::WinitWindow, types::Vec3};
+use crate::implementation::window::winit::WinitWindow;
 
 use super::{
     event_handler::EventHandler,
@@ -77,30 +77,15 @@ impl WindowEventHandler for Engine {
     }
 }
 
+#[derive(Default)]
 pub struct EngineBuilder {
-    clear_color: Vec3,
     window_builder: WindowBuilder,
-}
-
-impl Default for EngineBuilder {
-    fn default() -> Self {
-        Self {
-            window_builder: WindowBuilder::default(),
-            clear_color: Vec3::new(0.9, 0.8, 0.7),
-        }
-    }
 }
 
 impl EngineBuilder {
     pub fn build(self) -> Engine {
         Engine::new(self)
     }
-
-    pub fn with_clear_color(mut self, r: f32, g: f32, b: f32) -> Self {
-        self.clear_color = Vec3::new(r, g, b);
-        self
-    }
-
     pub fn with_window(mut self, window_builder: WindowBuilder) -> Self {
         self.window_builder = window_builder;
         self

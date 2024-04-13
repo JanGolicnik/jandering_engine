@@ -1,11 +1,6 @@
-use crate::core::renderer::Renderer;
+use super::{Vec2, Vec3, Vertex};
 
-use super::{Object, ObjectRenderData, Vec2, Vec3, Vertex};
-
-pub fn triangle<T>(renderer: &mut Renderer, instances: Vec<T>) -> Object<T>
-where
-    T: bytemuck::Pod,
-{
+pub fn triangle_data() -> (Vec<Vertex>, Vec<u32>) {
     let vertices = vec![
         Vertex {
             position: Vec3::new(0.0, 1.0, 0.0),
@@ -25,27 +20,7 @@ where
     ];
 
     let indices = vec![0, 1, 2];
-
-    let render_data = {
-        let vertex_buffer = renderer.create_vertex_buffer(bytemuck::cast_slice(&vertices));
-        let instance_buffer = renderer.create_vertex_buffer(bytemuck::cast_slice(&instances));
-        let index_buffer = renderer.create_index_buffer(bytemuck::cast_slice(&indices));
-        ObjectRenderData {
-            vertex_buffer,
-            instance_buffer,
-            index_buffer,
-        }
-    };
-
-    let previous_instances_len = instances.len();
-
-    Object {
-        vertices,
-        indices,
-        instances,
-        render_data,
-        previous_instances_len,
-    }
+    (vertices, indices)
 }
 
 // pub fn quad<T>(renderer: &Renderer, instances: Vec<T>) -> Object<T>

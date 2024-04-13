@@ -16,28 +16,38 @@ use jandering_engine::{
     },
     types::Vec3,
 };
+use star_object::StarObject;
+
+mod grass_object;
+mod star_object;
 
 struct Application {
-    last_time: web_time::Instant,
     time: f32,
+    last_time: web_time::Instant,
     fps_accumulator: f32,
     fps_counter: u32,
+
+    is_in_fps: bool,
+
     grass_lod1: GrassObject,
     grass_lod2: GrassObject,
     grass_shader: ShaderHandle,
     ground: Object<Instance>,
     ground_shader: ShaderHandle,
+    star_triangle: StarObject,
+    star_shader: ShaderHandle,
+
     heightmap_texture: BindGroupHandle<TextureBindGroup>,
     noise_texture: BindGroupHandle<TextureBindGroup>,
+
     camera: BindGroupHandle<FreeCameraBindGroup>,
     render_data: BindGroupHandle<RenderDataBindGroup>,
-    is_in_fps: bool,
 
     multisample_texture: TextureHandle,
     depth_texture: TextureHandle,
 }
 
-mod grass_object;
+const STAR_COUNT: u32 = 2000;
 
 const GRASS_DENSITY: f32 = 10.0;
 
@@ -72,7 +82,9 @@ impl Application {
                 .with_depth(true)
                 .with_backface_culling(false)
                 .with_multisample(MULTISAMPLE)
-                .with_source(include_str!("grass_shader.wgsl")),
+                .with_source(include_str!("terrain_shader.wgsl"))
+                .with_fs_entry("fs_grass")
+                .with_vs_entry("vs_grass"),
         );
 
         let ground_shader = engine.renderer.create_shader(
@@ -86,7 +98,22 @@ impl Application {
                 .with_backface_culling(false)
                 .with_depth(true)
                 .with_multisample(MULTISAMPLE)
-                .with_source(include_str!("ground_shader.wgsl")),
+                .with_source(include_str!("terrain_shader.wgsl"))
+                .with_fs_entry("fs_ground")
+                .with_vs_entry("vs_ground"),
+        );
+
+        let star_shader = engine.renderer.create_shader(
+            ShaderDescriptor::default()
+                .with_descriptors(&[Vertex::desc()])
+                .with_bind_group_layouts(vec![
+                    FreeCameraBindGroup::get_layout(),
+                    render_data_bind_group_layout.clone(),
+                ])
+                .with_backface_culling(true)
+                .with_depth(true)
+                .with_multisample(MULTISAMPLE)
+                .with_source(include_str!("star_shader.wgsl")),
         );
 
         let render_data = engine.renderer.create_bind_group(render_data);
@@ -104,9 +131,12 @@ impl Application {
 
         let ground = Object::from_obj(
             include_str!("plane.obj"),
+            // include_str!("grass_lod1.obj"),
             &mut engine.renderer,
             vec![Instance::default().scale(1000.0)],
         );
+
+        let star_triangle = StarObject::new(&mut engine.renderer, STAR_COUNT);
 
         let tex_sampler = engine.renderer.create_sampler(SamplerDescriptor {
             address_mode:
@@ -165,6 +195,8 @@ impl Application {
             is_in_fps: false,
             multisample_texture,
             depth_texture,
+            star_triangle,
+            star_shader,
         }
     }
 
@@ -269,16 +301,24 @@ impl EventHandler for Application {
         let camera = renderer.get_bind_group_t(self.camera).unwrap();
         renderer.write_bind_group(self.camera.into(), &camera.get_data());
 
+        let sky_color = renderer
+            .get_bind_group_t(self.render_data)
+            .unwrap()
+            .data
+            .sky_color;
+
         self.setup_grass_lod2(renderer);
 
         renderer
             .new_pass()
-            .set_shader(self.ground_shader)
+            .set_shader(self.star_shader)
             .with_target_texture_resolve(self.multisample_texture, None)
             .with_depth(self.depth_texture, Some(1.0))
-            .with_clear_color(0.2, 0.5, 1.0)
+            .with_clear_color(sky_color.x, sky_color.y, sky_color.z)
             .bind(0, self.camera.into())
             .bind(1, self.render_data.into())
+            .render(&[&self.star_triangle])
+            .set_shader(self.ground_shader)
             .bind(2, self.heightmap_texture.into())
             .render(&[&self.ground])
             .set_shader(self.grass_shader)
@@ -310,6 +350,7 @@ pub struct RenderDataData {
     time: f32,
     grass_top_color: Vec3,
     grass_height: f32,
+    sky_color: Vec3,
     grass_height_variation: f32,
     wind_strength: f32,
     wind_scale: f32,
@@ -321,7 +362,7 @@ pub struct RenderDataData {
     terrain_size: f32,
     render_square_size: f32,
     fov_x: f32,
-    padding: [f32; 1],
+    padding: [f32; 2],
 }
 
 pub struct RenderDataBindGroup {
@@ -348,6 +389,7 @@ impl RenderDataBindGroup {
             time: 0.0,
             ground_color: Vec3::new(0.1, 0.4, 0.2),
             grass_top_color: Vec3::new(0.5, 1.0, 0.6),
+            sky_color: Vec3::new(0.02, 0.05, 0.1),
             grass_height: 1.0,
             grass_height_variation: 0.5,
             wind_strength: 0.2,
@@ -356,12 +398,11 @@ impl RenderDataBindGroup {
             wind_direction: 0.0,
             wind_noise_scale: 2.0,
             wind_noise_strength: 0.1,
-            // sqrt_n_grass: (10_000_000.0f32.sqrt()) as u32,
             sqrt_n_grass: 0,
             terrain_size: 1000.0,
             render_square_size: 100.0,
             fov_x: 45.0,
-            padding: [0.0; 1],
+            padding: [0.0; 2],
         };
 
         let buffer_handle = renderer.create_uniform_buffer(bytemuck::cast_slice(&[data]));
@@ -387,7 +428,6 @@ fn main() {
                 .with_title("Grass")
                 .with_cursor(false),
         )
-        .with_clear_color(0.9, 0.8, 0.7)
         .build();
 
     let app = pollster::block_on(Application::new(&mut engine));

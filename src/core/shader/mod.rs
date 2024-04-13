@@ -62,6 +62,16 @@ impl<'a> ShaderDescriptor<'a> {
         self
     }
 
+    pub fn with_vs_entry(mut self, entry: &'static str) -> Self {
+        self.vs_entry = entry;
+        self
+    }
+
+    pub fn with_fs_entry(mut self, entry: &'static str) -> Self {
+        self.fs_entry = entry;
+        self
+    }
+
     pub fn with_source(mut self, code: &'static str) -> Self {
         self.code = code;
         self

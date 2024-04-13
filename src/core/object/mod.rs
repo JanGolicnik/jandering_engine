@@ -1,5 +1,7 @@
 use crate::{types::*, utils::load_obj};
 
+use self::primitives::triangle_data;
+
 use super::renderer::{BufferHandle, Renderer};
 
 pub mod primitives;
@@ -199,6 +201,34 @@ impl<T: bytemuck::Pod> Object<T> {
     pub fn from_obj(data: &str, renderer: &mut Renderer, instances: Vec<T>) -> Object<T> {
         let (vertices, indices) = load_obj(data);
         Self::new(renderer, vertices, indices, instances)
+    }
+
+    pub fn triangle(renderer: &mut Renderer, instances: Vec<T>) -> Self
+    where
+        T: bytemuck::Pod,
+    {
+        let (vertices, indices) = triangle_data();
+
+        let render_data = {
+            let vertex_buffer = renderer.create_vertex_buffer(bytemuck::cast_slice(&vertices));
+            let instance_buffer = renderer.create_vertex_buffer(bytemuck::cast_slice(&instances));
+            let index_buffer = renderer.create_index_buffer(bytemuck::cast_slice(&indices));
+            ObjectRenderData {
+                vertex_buffer,
+                instance_buffer,
+                index_buffer,
+            }
+        };
+
+        let previous_instances_len = instances.len();
+
+        Self {
+            vertices,
+            indices,
+            instances,
+            render_data,
+            previous_instances_len,
+        }
     }
 }
 

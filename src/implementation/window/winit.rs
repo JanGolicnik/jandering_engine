@@ -121,7 +121,6 @@ impl Window for WinitWindow {
 
                         let event = match event {
                             WindowEvent::Resized(size) => {
-                                dbg!(event);
                                 if self.is_init {
                                     self.ignore_next_resize = false;
                                     return;
@@ -189,7 +188,6 @@ impl Window for WinitWindow {
                                 }
                             }
                             WindowEvent::RedrawRequested => {
-                                dbg!(event);
                                 crate::core::window::WindowEvent::RedrawRequested
                             }
                             _ => {
@@ -202,7 +200,6 @@ impl Window for WinitWindow {
                         self.is_init = cause == StartCause::Init;
                     }
                     winit::event::Event::AboutToWait => {
-                        dbg!(e);
                         event_handler
                             .on_event(crate::core::window::WindowEvent::EventsCleared, self);
                     }
