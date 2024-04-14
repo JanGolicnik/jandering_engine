@@ -49,7 +49,13 @@ pub trait Renderer {
 
     fn new_pass<'renderer>(&'renderer mut self) -> Box<dyn RenderPass + 'renderer>;
 
+    fn create_shader_at(&mut self, desc: ShaderDescriptor, handle: ShaderHandle);
+
     fn create_shader(&mut self, desc: ShaderDescriptor) -> ShaderHandle;
+
+    fn re_create_shader(&mut self, handle: ShaderHandle);
+
+    fn re_create_shaders(&mut self);
 
     fn create_texture_at(&mut self, desc: TextureDescriptor, handle: TextureHandle);
 

@@ -58,9 +58,10 @@ fn vs_main(
 ) -> VertexOutput{
     var state = instance_index;
     let random_vec = normalize(vec3<f32>(random_float(&state), random_float(&state), random_float(&state)) * 2.0 - 1.0) * 1000.0;
-    let position = vec4<f32>(random_vec + camera.view_pos.xyz, 1.0) ;
+    let position = vec4<f32>(random_vec + camera.view_pos.xyz, 1.0);
+    // let position = vec4<f32>(random_vec, 1.0);
     let random_size = random_float(&state);
-    let size = 10.0 * (1.0 + random_size * random_size);
+    let size = 5.0 * (1.0 + random_size * random_size);
 
     let world_pos = position + camera.right * vertex.position.x * size + camera.up * vertex.position.y * size;
     

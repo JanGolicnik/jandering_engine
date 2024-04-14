@@ -36,7 +36,7 @@ impl Application {
 
         let shader = engine.renderer.create_shader(
             ShaderDescriptor::default()
-                .with_descriptors(&[Vertex::desc(), Instance::desc()])
+                .with_descriptors(vec![Vertex::desc(), Instance::desc()])
                 .with_bind_group_layouts(vec![FreeCameraBindGroup::get_layout()])
                 .with_depth(true)
                 .with_backface_culling(false),

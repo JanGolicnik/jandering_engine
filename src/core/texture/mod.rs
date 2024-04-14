@@ -26,8 +26,8 @@ pub mod texture_usage {
     pub const BIND: TextureUsage = 1 << 2;
     pub const TARGET: TextureUsage = 1 << 3;
 }
+
 pub struct TextureDescriptor<'data> {
-    pub address_mode: wgpu::AddressMode,
     pub size: UVec2,
     pub sample_count: u32,
     pub data: Option<&'data [u8]>,
@@ -38,7 +38,6 @@ pub struct TextureDescriptor<'data> {
 impl<'data> Default for TextureDescriptor<'data> {
     fn default() -> Self {
         Self {
-            address_mode: wgpu::AddressMode::ClampToEdge,
             size: UVec2::new(0, 0),
             sample_count: 1,
             format: TextureFormat::Bgra8U,

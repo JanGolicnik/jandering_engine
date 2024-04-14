@@ -1,22 +1,23 @@
 use super::bind_group::BindGroupLayout;
 
-pub struct ShaderDescriptor<'a> {
-    pub code: &'a str,
-    pub descriptors: &'a [wgpu::VertexBufferLayout<'a>], //TODO: abstract this away so there is no dependency on wgpu
+#[derive(Clone)]
+pub struct ShaderDescriptor {
+    pub code: &'static str,
+    pub descriptors: Vec<wgpu::VertexBufferLayout<'static>>, //TODO: abstract this away so there is no dependency on wgpu
     pub bind_group_layouts: Vec<BindGroupLayout>,
-    pub vs_entry: &'a str,
-    pub fs_entry: &'a str,
+    pub vs_entry: &'static str,
+    pub fs_entry: &'static str,
     pub backface_culling: bool,
     pub depth: bool,
     pub stripped: bool,
     pub multisample: u32,
 }
 
-impl<'a> Default for ShaderDescriptor<'a> {
+impl Default for ShaderDescriptor {
     fn default() -> Self {
         Self {
             code: include_str!("default_shader.wgsl"),
-            descriptors: &[],
+            descriptors: Vec::new(),
             bind_group_layouts: Vec::new(),
             vs_entry: "vs_main",
             fs_entry: "fs_main",
@@ -28,7 +29,7 @@ impl<'a> Default for ShaderDescriptor<'a> {
     }
 }
 
-impl<'a> ShaderDescriptor<'a> {
+impl ShaderDescriptor {
     pub fn default_flat() -> Self {
         Self {
             code: include_str!("flat_shader.wgsl"),
@@ -37,8 +38,8 @@ impl<'a> ShaderDescriptor<'a> {
     }
 }
 
-impl<'a> ShaderDescriptor<'a> {
-    pub fn with_descriptors(mut self, descriptors: &'a [wgpu::VertexBufferLayout<'a>]) -> Self {
+impl ShaderDescriptor {
+    pub fn with_descriptors(mut self, descriptors: Vec<wgpu::VertexBufferLayout<'static>>) -> Self {
         self.descriptors = descriptors;
         self
     }

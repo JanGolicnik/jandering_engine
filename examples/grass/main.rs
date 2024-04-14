@@ -50,7 +50,7 @@ struct Application {
     depth_texture: TextureHandle,
 }
 
-const STAR_COUNT: u32 = 2000;
+const STAR_COUNT: u32 = 1000;
 
 const GRASS_DENSITY: f32 = 10.0;
 
@@ -73,7 +73,7 @@ impl Application {
 
         let grass_shader = engine.renderer.create_shader(
             ShaderDescriptor::default()
-                .with_descriptors(&[Vertex::desc()])
+                .with_descriptors(vec![Vertex::desc()])
                 .with_bind_group_layouts(vec![
                     FreeCameraBindGroup::get_layout(),
                     render_data_bind_group_layout.clone(),
@@ -90,7 +90,7 @@ impl Application {
 
         let ground_shader = engine.renderer.create_shader(
             ShaderDescriptor::default()
-                .with_descriptors(&[Vertex::desc(), Instance::desc()])
+                .with_descriptors(vec![Vertex::desc(), Instance::desc()])
                 .with_bind_group_layouts(vec![
                     FreeCameraBindGroup::get_layout(),
                     render_data_bind_group_layout.clone(),
@@ -106,7 +106,7 @@ impl Application {
 
         let star_shader = engine.renderer.create_shader(
             ShaderDescriptor::default()
-                .with_descriptors(&[Vertex::desc()])
+                .with_descriptors(vec![Vertex::desc()])
                 .with_bind_group_layouts(vec![
                     FreeCameraBindGroup::get_layout(),
                     render_data_bind_group_layout.clone(),
@@ -160,7 +160,6 @@ impl Application {
         let noise_handle = engine.renderer.create_texture(TextureDescriptor {
             data: Some(&noise_image.to_rgba8()),
             size: noise_image.dimensions().into(),
-            address_mode: wgpu::AddressMode::Repeat,
             ..Default::default()
         });
         let noise_texture =
@@ -295,6 +294,18 @@ impl EventHandler for Application {
                 },
                 self.multisample_texture,
             );
+        }
+
+        if context.events.iter().any(|e| {
+            matches!(
+                e,
+                WindowEvent::KeyInput {
+                    key: Key::B,
+                    state: InputState::Pressed
+                }
+            )
+        }) {
+            context.renderer.re_create_shaders();
         }
     }
 

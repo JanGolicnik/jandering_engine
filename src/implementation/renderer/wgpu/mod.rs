@@ -39,6 +39,7 @@ pub struct WGPURenderer {
     config: wgpu::SurfaceConfiguration,
     pub queue: wgpu::Queue,
     pub(crate) shaders: Vec<Shader>,
+    shader_descriptors: Vec<ShaderDescriptor>,
     bind_groups: Vec<Box<dyn BindGroup>>,
     bind_groups_render_data: Vec<BindGroupRenderData>,
     pub(crate) textures: Vec<Texture>,
@@ -138,7 +139,7 @@ impl Renderer for WGPURenderer {
         Box::new(WGPURenderPass::new(self))
     }
 
-    fn create_shader(&mut self, desc: ShaderDescriptor) -> ShaderHandle {
+    fn create_shader_at(&mut self, desc: ShaderDescriptor, handle: ShaderHandle) {
         //ugly ass code fuck off
         let bind_group_layouts = Self::get_layouts(&self.device, &desc.bind_group_layouts);
         let bind_group_ref = bind_group_layouts.iter().collect::<Vec<_>>();
@@ -171,7 +172,7 @@ impl Renderer for WGPURenderer {
                 vertex: wgpu::VertexState {
                     module: &shader,
                     entry_point: desc.vs_entry,
-                    buffers: desc.descriptors,
+                    buffers: &desc.descriptors,
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
@@ -213,9 +214,29 @@ impl Renderer for WGPURenderer {
                 },
                 multiview: None,
             });
-        self.shaders.push(Shader { pipeline });
 
+        let shader = Shader { pipeline };
+
+        if handle.0 >= self.shaders.len() {
+            self.shaders.push(shader);
+            self.shader_descriptors.push(desc);
+        } else {
+            self.shaders[handle.0] = shader;
+        }
+    }
+
+    fn create_shader(&mut self, desc: ShaderDescriptor) -> ShaderHandle {
+        self.create_shader_at(desc, ShaderHandle(self.shaders.len()));
         ShaderHandle(self.shaders.len() - 1)
+    }
+
+    fn re_create_shader(&mut self, handle: ShaderHandle) {
+        let descriptor = &self.shader_descriptors[handle.0];
+        self.create_shader_at(descriptor.clone(), handle);
+    }
+
+    fn re_create_shaders(&mut self) {
+        (0..self.shaders.len()).for_each(|e| self.re_create_shader(ShaderHandle(e)));
     }
 
     fn create_texture_at(&mut self, desc: TextureDescriptor, handle: TextureHandle) {
@@ -481,6 +502,7 @@ impl WGPURenderer {
             textures: Vec::new(),
             samplers: Vec::new(),
             shaders: Vec::new(),
+            shader_descriptors: Vec::new(),
             bind_groups: Vec::new(),
             bind_groups_render_data: Vec::new(),
             buffers: Vec::new(),
