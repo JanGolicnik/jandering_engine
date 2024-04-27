@@ -1,19 +1,24 @@
+use crate::utils::SQRT_3;
+
 use super::{Vec2, Vec3, Vertex};
 
 pub fn triangle_data() -> (Vec<Vertex>, Vec<u32>) {
+    let height = SQRT_3 * 0.5;
+    let center = 1.0 - SQRT_3 / 3.0;
+
     let vertices = vec![
         Vertex {
-            position: Vec3::new(0.0, 1.0, 0.0),
+            position: Vec3::new(0.0, center + height, 0.0),
             normal: Vec3::NEG_Z,
             uv: Vec2::new(1.0, 1.0),
         },
         Vertex {
-            position: Vec3::new(1.0, -1.0, 0.0),
+            position: Vec3::new(1.0, center - 1.0, 0.0),
             normal: Vec3::NEG_Z,
             uv: Vec2::new(1.0, 0.0),
         },
         Vertex {
-            position: Vec3::new(-1.0, -1.0, 0.0),
+            position: Vec3::new(-1.0, center - 1.0, 0.0),
             normal: Vec3::NEG_Z,
             uv: Vec2::new(0.0, 1.0),
         },
@@ -23,66 +28,34 @@ pub fn triangle_data() -> (Vec<Vertex>, Vec<u32>) {
     (vertices, indices)
 }
 
-// pub fn quad<T>(renderer: &Renderer, instances: Vec<T>) -> Object<T>
-// where
-//     T: bytemuck::Pod,
-// {
-//     let vertices = vec![
-//         VertexRaw {
-//             position: Vec3::new(-1.0, -1.0, 0.0),
-//             uv: Vec2::new(0.0, 0.0),
-//         },
-//         VertexRaw {
-//             position: Vec3::new(1.0, 1.0, 0.0),
-//             uv: Vec2::new(1.0, 1.0),
-//         },
-//         VertexRaw {
-//             position: Vec3::new(1.0, -1.0, 0.0),
-//             uv: Vec2::new(1.0, 0.0),
-//         },
-//         VertexRaw {
-//             position: Vec3::new(-1.0, 1.0, 0.0),
-//             uv: Vec2::new(0.0, 1.0),
-//         },
-//     ];
+pub fn quad_data() -> (Vec<Vertex>, Vec<u32>) {
+    let vertices = vec![
+        Vertex {
+            position: Vec3::new(-1.0, -1.0, 0.0),
+            uv: Vec2::new(0.0, 0.0),
+            normal: Vec3::new(-1.0, -1.0, 1.0),
+        },
+        Vertex {
+            position: Vec3::new(1.0, 1.0, 0.0),
+            uv: Vec2::new(1.0, 1.0),
+            normal: Vec3::new(1.0, 1.0, 1.0),
+        },
+        Vertex {
+            position: Vec3::new(1.0, -1.0, 0.0),
+            uv: Vec2::new(1.0, 0.0),
+            normal: Vec3::new(1.0, -1.0, 1.0),
+        },
+        Vertex {
+            position: Vec3::new(-1.0, 1.0, 0.0),
+            uv: Vec2::new(0.0, 1.0),
+            normal: Vec3::new(-1.0, 1.0, 1.0),
+        },
+    ];
 
-//     let indices = vec![0, 2, 1, 0, 1, 3];
+    let indices = vec![0, 2, 1, 0, 1, 3];
 
-//     let vertex_buffer = renderer
-//         .device
-//         .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-//             label: Some("Vertex Buffer"),
-//             contents: bytemuck::cast_slice(&vertices),
-//             usage: wgpu::BufferUsages::VERTEX,
-//         });
-//     let index_buffer = renderer
-//         .device
-//         .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-//             label: Some("Index Buffer"),
-//             contents: bytemuck::cast_slice(&indices),
-//             usage: wgpu::BufferUsages::INDEX,
-//         });
-//     let instance_buffer = renderer
-//         .device
-//         .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-//             label: Some("Instance Buffer"),
-//             contents: bytemuck::cast_slice(&instances),
-//             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-//         });
-
-//     let previous_instances_len = instances.len();
-//     Object {
-//         vertices,
-//         indices,
-//         instances,
-//         render_data: Some(super::ObjectRenderData {
-//             vertex_buffer,
-//             index_buffer,
-//             instance_buffer,
-//         }),
-//         previous_instances_len,
-//     }
-// }
+    (vertices, indices)
+}
 
 // pub fn circle<T>(renderer: &Renderer, instances: Vec<T>, resolution: u32) -> Object<T>
 // where

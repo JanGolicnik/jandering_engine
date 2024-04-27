@@ -4,6 +4,10 @@ use crate::{
     core::object::Vertex,
     types::{UVec2, Vec2, Vec3},
 };
+
+pub const SQRT_3: f32 = 1.732_050_8;
+
+#[derive(Clone)]
 pub enum FilePath<'a> {
     FileName(&'a str),
     AbsolutePath(PathBuf),

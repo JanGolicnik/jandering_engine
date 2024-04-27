@@ -40,7 +40,7 @@ pub struct WGPURenderer {
     pub queue: wgpu::Queue,
     pub(crate) shaders: Vec<Shader>,
     shader_descriptors: Vec<ShaderDescriptor>,
-    bind_groups: Vec<Box<dyn BindGroup>>,
+    bind_groups: Vec<Box<dyn BindGroup + Send>>,
     bind_groups_render_data: Vec<BindGroupRenderData>,
     pub(crate) textures: Vec<Texture>,
     pub(crate) samplers: Vec<wgpu::Sampler>,
@@ -152,9 +152,13 @@ impl Renderer for WGPURenderer {
                 push_constant_ranges: &[],
             });
 
+        let code = match desc.source {
+            crate::core::shader::ShaderSource::Code(code) => code.to_string(),
+        };
+
         let shader = wgpu::ShaderModuleDescriptor {
             label: Some("Shader"),
-            source: wgpu::ShaderSource::Wgsl(desc.code.into()),
+            source: wgpu::ShaderSource::Wgsl(code.clone().into()),
         };
 
         let targets = &[Some(wgpu::ColorTargetState {
@@ -236,7 +240,9 @@ impl Renderer for WGPURenderer {
     }
 
     fn re_create_shaders(&mut self) {
-        (0..self.shaders.len()).for_each(|e| self.re_create_shader(ShaderHandle(e)));
+        for i in 0..self.shaders.len() {
+            self.re_create_shader(ShaderHandle(i));
+        }
     }
 
     fn create_texture_at(&mut self, desc: TextureDescriptor, handle: TextureHandle) {
@@ -390,7 +396,10 @@ impl Renderer for WGPURenderer {
             .write_buffer(&self.buffers[render_data.buffer_handle.0], 0, data);
     }
 
-    fn create_bind_group(&mut self, bind_group: Box<dyn BindGroup>) -> UntypedBindGroupHandle {
+    fn create_bind_group(
+        &mut self,
+        bind_group: Box<dyn BindGroup + Send>,
+    ) -> UntypedBindGroupHandle {
         {
             let layout = bind_group.get_layout(self);
             let bind_group_layout = Self::get_layout(&self.device, &layout);
@@ -456,7 +465,6 @@ impl WGPURenderer {
             })
             .await
             .unwrap();
-
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {

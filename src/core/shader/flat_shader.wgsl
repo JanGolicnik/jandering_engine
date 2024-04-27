@@ -1,15 +1,16 @@
-struct Resolution {
-    width: u32,
-    height: u32
+struct Camera {
+    position: vec2<f32>,
+    resolution: vec2<f32>
 };
 
 @group(0) @binding(0)
-var<uniform> resolution: Resolution;
+var<uniform> camera: Camera;
 
 struct InstanceInput{
     @location(5) position: vec2<f32>,
     @location(6) scale: vec2<f32>,
     @location(7) rotation: f32,
+    @location(8) color: vec3<f32>,
 }
 
 struct VertexInput{
@@ -20,6 +21,7 @@ struct VertexInput{
 struct VertexOutput{
     @builtin(position) clip_position: vec4<f32>,
     @location(0) uv: vec2<f32>,
+    @location(1) color: vec3<f32>,
 };
 
 @vertex
@@ -28,33 +30,36 @@ fn vs_main(
     instance: InstanceInput
 ) -> VertexOutput{
 
-    // var vertex_pos = model.position.xy;
-    // vertex_pos *= instance.scale * 0.5;
+    var vertex_pos = model.position.xy;
+    vertex_pos *= instance.scale * 0.5;
     
-    // let sin_a = sin(instance.rotation);
-    // let cos_a = cos(instance.rotation);
-    // vertex_pos = vec2<f32>(vertex_pos.x * cos_a - vertex_pos.y * sin_a, vertex_pos.x * sin_a + vertex_pos.y * cos_a);
+    let sin_a = sin(instance.rotation);
+    let cos_a = cos(instance.rotation);
+    vertex_pos = vec2<f32>(vertex_pos.x * cos_a - vertex_pos.y * sin_a, vertex_pos.x * sin_a + vertex_pos.y * cos_a);
 
-    // var position = instance.position + vertex_pos;
+    var position = instance.position + vertex_pos;
 
-    // var out: VertexOutput;
-    // out.clip_position = vec4<f32>(position, 0.0, 1.0);
-    // out.uv = model.uv;
+    position -= camera.position;
+    position /= camera.resolution;
     
-    // return out;
-
-    var  vertex_pos = model.position.xy;
-    vertex_pos.x /= f32(resolution.width) / f32(resolution.height);
-
     var out: VertexOutput;
-    out.clip_position = vec4<f32>(vertex_pos, 0.0, 1.0);
+    out.clip_position = vec4<f32>(position, 0.0, 1.0);
     out.uv = model.uv;
+    out.color = instance.color;
     
     return out;
+
+    // vertex_pos.x /= f32(camera.resolution.x) / f32(camera.resolution.y);
+
+    // var out: VertexOutput;
+    // out.clip_position = vec4<f32>(vertex_pos, 0.0, 1.0);
+    // out.uv = model.uv;
+    // out.color = instance.color;
+    
+    // return out;
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32>{
-    let uv = vec2<f32>(in.uv.x, 1.0 - in.uv.y);
-    return vec4<f32>(uv, 1.0, 1.0);
+    return vec4<f32>(in.color, 1.0);
 }

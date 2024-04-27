@@ -57,7 +57,7 @@ unsafe impl raw_window_handle::HasRawDisplayHandle for dyn Window {
 }
 
 // Adapted (taken 😈) from winit
-#[derive(Copy, Debug, Clone)]
+#[derive(Copy, Debug, Clone, PartialEq)]
 pub enum Key {
     Key1,
     Key2,
@@ -161,13 +161,13 @@ pub enum Key {
     Unknown,
 }
 
-#[derive(Copy, Debug, Clone)]
+#[derive(Copy, Debug, Clone, PartialEq)]
 pub enum InputState {
     Released,
     Pressed,
 }
 
-#[derive(Copy, Debug, Clone)]
+#[derive(Copy, Debug, Clone, PartialEq, Eq)]
 pub enum MouseButton {
     Left,
     Right,
@@ -175,7 +175,7 @@ pub enum MouseButton {
     Unknown,
 }
 
-#[derive(Copy, Debug, Clone)]
+#[derive(Copy, Debug, Clone, PartialEq)]
 pub enum WindowEvent {
     Resized((u32, u32)),
 
@@ -195,6 +195,9 @@ pub enum WindowEvent {
     RedrawRequested,
     CloseRequested,
     EventsCleared,
+
+    MouseEntered,
+    MouseLeft,
 }
 
 pub struct WindowBuilder {

@@ -204,6 +204,7 @@ impl<'renderer> RenderPass<'renderer> for WGPURenderPass<'renderer> {
         self
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn with_target_texture_resolve(
         mut self: Box<Self>,
         target: TextureHandle,

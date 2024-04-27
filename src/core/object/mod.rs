@@ -1,6 +1,6 @@
 use crate::{types::*, utils::load_obj};
 
-use self::primitives::triangle_data;
+use self::primitives::{quad_data, triangle_data};
 
 use super::renderer::{BufferHandle, Renderer};
 
@@ -208,27 +208,15 @@ impl<T: bytemuck::Pod> Object<T> {
         T: bytemuck::Pod,
     {
         let (vertices, indices) = triangle_data();
+        Self::new(renderer, vertices, indices, instances)
+    }
 
-        let render_data = {
-            let vertex_buffer = renderer.create_vertex_buffer(bytemuck::cast_slice(&vertices));
-            let instance_buffer = renderer.create_vertex_buffer(bytemuck::cast_slice(&instances));
-            let index_buffer = renderer.create_index_buffer(bytemuck::cast_slice(&indices));
-            ObjectRenderData {
-                vertex_buffer,
-                instance_buffer,
-                index_buffer,
-            }
-        };
-
-        let previous_instances_len = instances.len();
-
-        Self {
-            vertices,
-            indices,
-            instances,
-            render_data,
-            previous_instances_len,
-        }
+    pub fn quad(renderer: &mut dyn Renderer, instances: Vec<T>) -> Self
+    where
+        T: bytemuck::Pod,
+    {
+        let (vertices, indices) = quad_data();
+        Self::new(renderer, vertices, indices, instances)
     }
 }
 
@@ -238,6 +226,7 @@ pub struct D2Instance {
     pub position: Vec2,
     pub scale: Vec2,
     pub rotation: f32,
+    pub color: Vec3,
 }
 
 impl Default for D2Instance {
@@ -246,6 +235,7 @@ impl Default for D2Instance {
             position: Vec2::ZERO,
             scale: Vec2::ONE,
             rotation: 0.0,
+            color: Vec3::ONE,
         }
     }
 }
@@ -272,6 +262,11 @@ impl D2Instance {
                     offset: mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
                     shader_location: 7,
                     format: wgpu::VertexFormat::Float32,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 5]>() as wgpu::BufferAddress,
+                    shader_location: 8,
+                    format: wgpu::VertexFormat::Float32x3,
                 },
             ],
         }

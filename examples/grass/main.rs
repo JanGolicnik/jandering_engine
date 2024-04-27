@@ -13,7 +13,7 @@ use jandering_engine::{
             create_typed_bind_group, get_typed_bind_group, get_typed_bind_group_mut,
             BindGroupHandle, BufferHandle, Renderer, ShaderHandle, TextureHandle,
         },
-        shader::ShaderDescriptor,
+        shader::{ShaderDescriptor, ShaderSource},
         texture::{sampler::SamplerDescriptor, texture_usage, TextureDescriptor, TextureFormat},
         window::{InputState, Key, MouseButton, WindowBuilder, WindowEvent},
     },
@@ -83,7 +83,7 @@ impl Application {
                 .with_depth(true)
                 .with_backface_culling(false)
                 .with_multisample(MULTISAMPLE)
-                .with_source(include_str!("terrain_shader.wgsl"))
+                .with_source(ShaderSource::Code(include_str!("terrain_shader.wgsl")))
                 .with_fs_entry("fs_grass")
                 .with_vs_entry("vs_grass"),
         );
@@ -99,7 +99,7 @@ impl Application {
                 .with_backface_culling(false)
                 .with_depth(true)
                 .with_multisample(MULTISAMPLE)
-                .with_source(include_str!("terrain_shader.wgsl"))
+                .with_source(ShaderSource::Code(include_str!("terrain_shader.wgsl")))
                 .with_fs_entry("fs_ground")
                 .with_vs_entry("vs_ground"),
         );
@@ -114,7 +114,7 @@ impl Application {
                 .with_backface_culling(true)
                 .with_depth(true)
                 .with_multisample(MULTISAMPLE)
-                .with_source(include_str!("star_shader.wgsl")),
+                .with_source(ShaderSource::Code(include_str!("star_shader.wgsl"))),
         );
 
         let render_data = create_typed_bind_group(engine.renderer.as_mut(), render_data);
@@ -431,15 +431,14 @@ fn main() {
     //     .read_line(&mut input)
     //     .expect("error: unable to read user input");
 
-    let mut engine = EngineBuilder::default()
-        .with_window(
-            WindowBuilder::default()
-                .with_cursor(true)
-                .with_resolution(1920, 1080)
-                .with_title("Grass")
-                .with_cursor(false),
-        )
-        .build();
+    let builder = EngineBuilder::default().with_window(
+        WindowBuilder::default()
+            .with_cursor(true)
+            .with_resolution(1920, 1080)
+            .with_title("Grass")
+            .with_cursor(false),
+    );
+    let mut engine = pollster::block_on(builder.build());
 
     let app = pollster::block_on(Application::new(&mut engine));
 

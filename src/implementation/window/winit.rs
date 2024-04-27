@@ -8,6 +8,9 @@ use winit::{
 
 use crate::core::window::{Window, WindowBuilder, WindowEventHandler};
 
+#[cfg(target_arch = "wasm32")]
+use winit::platform::web::WindowExtWebSys;
+
 pub struct WinitWindow {
     event_loop: Option<winit::event_loop::EventLoop<()>>,
     window: winit::window::Window,
@@ -40,7 +43,7 @@ impl WinitWindow {
                 .and_then(|win| win.document())
                 .and_then(|doc| {
                     let dst = doc.get_element_by_id("jandering-engine-canvas-body")?;
-                    let canvas = web_sys::Element::from(window.canvas());
+                    let canvas = web_sys::Element::from(window.canvas().unwrap());
                     dst.append_child(&canvas).ok()?;
                     Some(())
                 })
@@ -112,14 +115,18 @@ impl Window for WinitWindow {
                 if !matches!(target.control_flow(), winit::event_loop::ControlFlow::Poll) {
                     target.set_control_flow(winit::event_loop::ControlFlow::Poll);
                 }
-
                 match e {
                     winit::event::Event::WindowEvent { window_id, event } => {
                         if window_id != self.window.id() {
                             return;
                         }
-
                         let event = match event {
+                            WindowEvent::CursorEntered { .. } => {
+                                crate::core::window::WindowEvent::MouseEntered
+                            }
+                            WindowEvent::CursorLeft { .. } => {
+                                crate::core::window::WindowEvent::MouseLeft
+                            }
                             WindowEvent::Resized(size) => {
                                 if self.is_init {
                                     self.ignore_next_resize = false;
@@ -165,6 +172,13 @@ impl Window for WinitWindow {
                                 delta: MouseScrollDelta::LineDelta(x, y),
                                 ..
                             } => crate::core::window::WindowEvent::Scroll((x, y)),
+                            WindowEvent::MouseWheel {
+                                delta: MouseScrollDelta::PixelDelta(pos),
+                                ..
+                            } => crate::core::window::WindowEvent::Scroll((
+                                if pos.x.is_sign_positive() { 1.0 } else { -1.0 },
+                                if pos.y.is_sign_positive() { 1.0 } else { -1.0 },
+                            )),
                             WindowEvent::MouseInput { state, button, .. } => {
                                 crate::core::window::WindowEvent::MouseInput {
                                     button: match button {

@@ -66,13 +66,13 @@ impl Application {
             .collect::<Vec<_>>();
 
         let susane = Object::from_obj(
-            include_str!("moneky/susane.obj"),
+            include_str!("susane.obj"),
             engine.renderer.as_mut(),
             susane_instances,
         );
 
         let ground = Object::from_obj(
-            include_str!("moneky/ground.obj"),
+            include_str!("ground.obj"),
             engine.renderer.as_mut(),
             vec![Instance::default()
                 .translate(Vec3::new(0.0, -5.0, 0.0))
@@ -138,7 +138,7 @@ impl EventHandler for Application {
         self.susane.instances.iter_mut().for_each(|e| {
             let position = e.model.col(3).xyz();
             let t = position.y / 1000.0;
-            *e = e.translate(Vec3::new(0.0, self.time.sin() * t * 10.0, 0.0));
+            *e = e.translate(Vec3::new(0.0, self.time.sin() * t * 100.0, 0.0));
         });
 
         self.susane.update(context.renderer.as_mut());
@@ -160,16 +160,14 @@ impl EventHandler for Application {
 }
 
 fn main() {
-    let mut engine = EngineBuilder::default()
-        .with_window(
-            WindowBuilder::default()
-                .with_cursor(true)
-                .with_resolution(1000, 1000)
-                .with_title("heyy")
-                .with_cursor(false),
-        )
-        .build();
-
+    let builder = EngineBuilder::default().with_window(
+        WindowBuilder::default()
+            .with_cursor(true)
+            .with_resolution(1000, 1000)
+            .with_title("heyy")
+            .with_cursor(false),
+    );
+    let mut engine = pollster::block_on(builder.build());
     let app = pollster::block_on(Application::new(&mut engine));
 
     engine.run(app);

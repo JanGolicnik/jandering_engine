@@ -27,6 +27,7 @@ anyhow = "1.0.79"
 glam = {version = "0.25.0", features = ["bytemuck"]}
 raw-window-handle = "0.5"
 rand = "0.8.5"
+async-trait = "0.1.80"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wgpu = {version = "0.18.0", features = ["webgl"]}

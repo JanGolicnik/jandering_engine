@@ -1,8 +1,13 @@
 use super::bind_group::BindGroupLayout;
 
 #[derive(Clone)]
+pub enum ShaderSource {
+    Code(&'static str),
+}
+
+#[derive(Clone)]
 pub struct ShaderDescriptor {
-    pub code: &'static str,
+    pub source: ShaderSource,
     pub descriptors: Vec<wgpu::VertexBufferLayout<'static>>, //TODO: abstract this away so there is no dependency on wgpu
     pub bind_group_layouts: Vec<BindGroupLayout>,
     pub vs_entry: &'static str,
@@ -16,7 +21,7 @@ pub struct ShaderDescriptor {
 impl Default for ShaderDescriptor {
     fn default() -> Self {
         Self {
-            code: include_str!("default_shader.wgsl"),
+            source: ShaderSource::Code(include_str!("default_shader.wgsl")),
             descriptors: Vec::new(),
             bind_group_layouts: Vec::new(),
             vs_entry: "vs_main",
@@ -30,9 +35,9 @@ impl Default for ShaderDescriptor {
 }
 
 impl ShaderDescriptor {
-    pub fn default_flat() -> Self {
+    pub fn flat() -> Self {
         Self {
-            code: include_str!("flat_shader.wgsl"),
+            source: ShaderSource::Code(include_str!("flat_shader.wgsl")),
             ..Default::default()
         }
     }
@@ -69,8 +74,8 @@ impl ShaderDescriptor {
         self
     }
 
-    pub fn with_source(mut self, code: &'static str) -> Self {
-        self.code = code;
+    pub fn with_source(mut self, source: ShaderSource) -> Self {
+        self.source = source;
         self
     }
 
@@ -79,6 +84,7 @@ impl ShaderDescriptor {
         self
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn with_multisample(mut self, value: u32) -> Self {
         self.multisample = value;
         self

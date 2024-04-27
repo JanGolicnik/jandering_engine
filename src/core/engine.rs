@@ -7,17 +7,16 @@ use super::{
 };
 
 pub struct Engine {
+    event_handler: Option<Box<dyn EventHandler>>,
     pub events: Vec<WindowEvent>,
     pub window: Option<Box<dyn Window>>,
     pub renderer: Box<dyn Renderer>,
-    event_handler: Option<Box<dyn EventHandler>>,
 }
 
 impl Engine {
-    pub fn new(builder: EngineBuilder) -> Self {
+    pub async fn new(builder: EngineBuilder) -> Self {
         let window: Box<dyn Window> = Box::new(WinitWindow::new(builder.window_builder));
-        let renderer = pollster::block_on(WGPURenderer::new(&window));
-
+        let renderer = WGPURenderer::new(&window).await;
         Self {
             events: Vec::new(),
             window: Some(window),
@@ -55,6 +54,7 @@ impl WindowEventHandler for Engine {
                     window,
                     renderer: &mut self.renderer,
                 };
+
                 self.event_handler.as_mut().unwrap().on_update(&mut context);
 
                 self.renderer.begin_frame();
@@ -77,15 +77,21 @@ impl WindowEventHandler for Engine {
     }
 }
 
-#[derive(Default)]
 pub struct EngineBuilder {
     window_builder: WindowBuilder,
 }
 
 impl EngineBuilder {
-    pub fn build(self) -> Engine {
-        Engine::new(self)
+    pub fn new() -> Self {
+        Self {
+            window_builder: WindowBuilder::default(),
+        }
     }
+
+    pub async fn build(self) -> Engine {
+        Engine::new(self).await
+    }
+
     pub fn with_window(mut self, window_builder: WindowBuilder) -> Self {
         self.window_builder = window_builder;
         self
