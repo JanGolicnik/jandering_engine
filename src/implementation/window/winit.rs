@@ -1,7 +1,7 @@
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
-    event::{KeyEvent, MouseButton, MouseScrollDelta, StartCause, WindowEvent},
+    event::{KeyEvent, MouseButton, MouseScrollDelta, StartCause, Touch, WindowEvent},
     keyboard::PhysicalKey,
     window::UserAttentionType,
 };
@@ -126,6 +126,26 @@ impl Window for WinitWindow {
                             }
                             WindowEvent::CursorLeft { .. } => {
                                 crate::core::window::WindowEvent::MouseLeft
+                            }
+                            WindowEvent::Touch(Touch { location, .. }) => {
+                                event_handler.on_event(
+                                    crate::core::window::WindowEvent::MouseMotion((
+                                        location.x as f32,
+                                        location.y as f32,
+                                    )),
+                                    self,
+                                );
+                                event_handler.on_event(
+                                    crate::core::window::WindowEvent::MouseInput {
+                                        button: crate::core::window::MouseButton::Left,
+                                        state: crate::core::window::InputState::Pressed,
+                                    },
+                                    self,
+                                );
+                                crate::core::window::WindowEvent::MouseInput {
+                                    button: crate::core::window::MouseButton::Left,
+                                    state: crate::core::window::InputState::Released,
+                                }
                             }
                             WindowEvent::Resized(size) => {
                                 if self.is_init {

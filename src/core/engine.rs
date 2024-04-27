@@ -77,17 +77,12 @@ impl WindowEventHandler for Engine {
     }
 }
 
+#[derive(Default)]
 pub struct EngineBuilder {
     window_builder: WindowBuilder,
 }
 
 impl EngineBuilder {
-    pub fn new() -> Self {
-        Self {
-            window_builder: WindowBuilder::default(),
-        }
-    }
-
     pub async fn build(self) -> Engine {
         Engine::new(self).await
     }
