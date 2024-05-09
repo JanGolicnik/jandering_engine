@@ -200,18 +200,21 @@ pub enum WindowEvent {
     MouseLeft,
 }
 
+pub enum WindowResolution {
+    Exact { width: u32, height: u32 },
+    Auto,
+}
+
 pub struct WindowBuilder {
     pub title: &'static str,
-    pub width: u32,
-    pub height: u32,
+    pub resolution: WindowResolution,
     pub show_cursor: bool,
 }
 
 impl Default for WindowBuilder {
     fn default() -> Self {
         Self {
-            width: 800,
-            height: 800,
+            resolution: WindowResolution::Auto,
             show_cursor: true,
             title: "Cool app",
         }
@@ -220,8 +223,14 @@ impl Default for WindowBuilder {
 
 impl WindowBuilder {
     pub fn with_resolution(mut self, w: u32, h: u32) -> Self {
-        self.width = w;
-        self.height = h;
+        self.resolution = WindowResolution::Exact {
+            width: w,
+            height: h,
+        };
+        self
+    }
+    pub fn with_auto_resolution(mut self) -> Self {
+        self.resolution = WindowResolution::Auto;
         self
     }
     pub fn with_cursor(mut self, val: bool) -> Self {

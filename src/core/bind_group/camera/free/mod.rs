@@ -2,9 +2,9 @@ use crate::{
     core::{
         bind_group::{BindGroup, BindGroupLayout, BindGroupLayoutEntry},
         renderer::{BufferHandle, Renderer},
-        window::{InputState, Key, Window, WindowEvent},
+        window::{InputState, Key, WindowEvent},
     },
-    types::{Mat4, UVec2, Vec3, DEG_TO_RAD},
+    types::{Mat4, Vec2, Vec3, DEG_TO_RAD},
 };
 
 use self::constants::*;
@@ -14,10 +14,15 @@ pub mod constants;
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CameraData {
-    up: [f32; 4],
-    right: [f32; 4],
-    view_position: [f32; 4],
-    view_proj: [[f32; 4]; 4],
+    up: Vec3,
+    up_padding: f32,
+    right: Vec3,
+    right_padding: f32,
+    position: Vec3,
+    position_padding: f32,
+    direction: Vec3,
+    direction_padding: f32,
+    view_proj: Mat4,
 }
 
 pub struct FreeCameraController {
@@ -31,31 +36,22 @@ pub struct FreeCameraController {
 
     pub yaw: f32,
     pub pitch: f32,
+
+    pub last_mouse_position: Option<Vec2>,
 }
 
-pub struct PerspectiveCameraData {
-    pub position: Vec3,
-    pub direction: Vec3,
-    //
-    pub fov: f32,
-    pub znear: f32,
-    pub zfar: f32,
-    pub aspect: f32,
+pub trait CameraController {
+    fn event(&mut self, event: WindowEvent);
+    fn update(&mut self, position: &mut Vec3, direction: &mut Vec3, dt: f32);
 }
 
-pub struct FreeCameraBindGroup {
-    perspective: PerspectiveCameraData,
-    //
-    controller: FreeCameraController,
-    //
+pub struct MatrixCameraBindGroup {
     data: CameraData,
-    //
-    // #[allow(dead_code)]
-    #[cfg(target_arch = "wasm32")]
-    last_mouse_position: Option<(f32, f32)>,
+    proj: Mat4,
+    controller: Option<Box<dyn CameraController>>,
 }
 
-impl BindGroup for FreeCameraBindGroup {
+impl BindGroup for MatrixCameraBindGroup {
     fn get_data(&self) -> Box<[u8]> {
         bytemuck::cast_slice(&[self.data]).into()
     }
@@ -68,113 +64,75 @@ impl BindGroup for FreeCameraBindGroup {
     }
 }
 
-impl Default for FreeCameraBindGroup {
+impl Default for MatrixCameraBindGroup {
     fn default() -> Self {
         let data = CameraData {
-            up: [0.0; 4],
-            right: [0.0; 4],
-            view_position: [0.0; 4],
-            view_proj: Mat4::IDENTITY.to_cols_array_2d(),
+            up: Vec3::ZERO,
+            up_padding: 0.0,
+            right: Vec3::ZERO,
+            right_padding: 0.0,
+            position: Vec3::ZERO,
+            position_padding: 0.0,
+            direction: -Vec3::Z,
+            direction_padding: 0.0,
+            view_proj: Mat4::IDENTITY,
         };
 
         Self {
-            perspective: PerspectiveCameraData {
-                position: Vec3 {
-                    x: 2.0,
-                    y: 2.0,
-                    z: 2.0,
-                },
-                direction: Vec3 {
-                    x: 0.0,
-                    y: 0.0,
-                    z: -1.0,
-                },
-                fov: 45.0,
-                znear: 0.1,
-                zfar: 100.0,
-                aspect: 1.0,
-            },
-            controller: FreeCameraController {
-                ..Default::default()
-            },
+            controller: None,
+            proj: Mat4::IDENTITY,
             data,
-            #[cfg(target_arch = "wasm32")]
-            last_mouse_position: None,
         }
     }
 }
 
-impl FreeCameraBindGroup {
-    pub fn resize(&mut self, physical_size: UVec2) {
-        self.perspective.aspect = physical_size.x as f32 / physical_size.y as f32;
+impl MatrixCameraBindGroup {
+    pub fn with_controller(controller: Box<dyn CameraController>) -> Self {
+        let mut this = Self::default();
+        this.attach_controller(controller);
+        this
+    }
+
+    pub fn make_perspective(&mut self, fov: f32, aspect: f32, znear: f32, zfar: f32) {
+        self.proj = Mat4::perspective_rh(fov * DEG_TO_RAD, aspect, znear, zfar);
+    }
+
+    pub fn make_ortho(
+        &mut self,
+        left: f32,
+        right: f32,
+        bottom: f32,
+        top: f32,
+        near: f32,
+        far: f32,
+    ) {
+        self.proj = Mat4::orthographic_rh(left, right, bottom, top, near, far);
     }
 
     pub fn update_data(&mut self) {
-        let PerspectiveCameraData {
-            position,
-            direction,
-            aspect,
-            znear,
-            zfar,
-            fov,
-            ..
-        } = &self.perspective;
-
-        let right = CAMERA_UP.cross(*direction).normalize();
-        self.data.right = [right.x, right.y, right.z, 0.0];
-
-        let up = direction.cross(right).normalize();
-        self.data.up = [up.x, up.y, up.z, 0.0];
+        self.data.right = CAMERA_UP.cross(self.data.direction).normalize();
+        self.data.up = self.data.direction.cross(self.data.right).normalize();
 
         self.data.view_proj = {
-            let view = Mat4::look_at_rh(*position, *position + *direction, CAMERA_UP);
-            let proj = Mat4::perspective_rh(*fov, *aspect, *znear, *zfar);
-            OPENGL_TO_WGPU_MATRIX * proj * view
-        }
-        .to_cols_array_2d();
-        self.data.view_position = [position.x, position.y, position.z, 1.0];
+            let view = Mat4::look_at_rh(
+                self.data.position,
+                self.data.position + self.data.direction,
+                CAMERA_UP,
+            );
+            OPENGL_TO_WGPU_MATRIX * self.proj * view
+        };
     }
 
-    pub fn update(
-        &mut self,
-        events: &[WindowEvent],
-        window: &dyn Window,
-        resolution: UVec2,
-        dt: f32,
-    ) {
-        self.resize(resolution);
-        for event in events.iter() {
-            self.controller.event(event);
+    pub fn update(&mut self, events: &[WindowEvent], dt: f32) {
+        if let Some(controller) = &mut self.controller {
+            let controller = controller.as_mut();
 
-            if let WindowEvent::MouseMotion((x, y)) = event {
-                let x = *x;
-                let y = *y;
-                cfg_if::cfg_if! {
-                if #[cfg(target_arch = "wasm32")]{
-                    let last_mouse_position = self.last_mouse_position.unwrap_or((x, y));
-                    let dx = x - last_mouse_position.0;
-                    let dy = y - last_mouse_position.1;
-                    self.last_mouse_position = Some((x, y));
-                }else{
-                    let dx = x- resolution.x as f32 / 2.0;
-                    let dy = y- resolution.y as f32 / 2.0;
-                    window
-                        .set_cursor_position(
-                            resolution.x / 2,
-                            resolution.y / 2,
-                        );
-                }
-                }
-
-                self.controller.cursor_moved(dx, dy);
+            for event in events.iter() {
+                controller.event(*event);
             }
-        }
 
-        self.controller.update(
-            &mut self.perspective.position,
-            &mut self.perspective.direction,
-            dt,
-        );
+            controller.update(&mut self.data.position, &mut self.data.direction, dt);
+        }
 
         self.update_data()
     }
@@ -183,6 +141,19 @@ impl FreeCameraBindGroup {
         BindGroupLayout {
             entries: vec![BindGroupLayoutEntry::Data(BufferHandle(0))],
         }
+    }
+
+    pub fn attach_controller(&mut self, controller: Box<dyn CameraController>) -> &mut Self {
+        self.controller = Some(controller);
+        self
+    }
+
+    pub fn position(&mut self) -> &mut Vec3 {
+        &mut self.data.position
+    }
+
+    pub fn direction(&mut self) -> &mut Vec3 {
+        &mut self.data.direction
     }
 }
 
@@ -202,19 +173,29 @@ impl Default for FreeCameraController {
             },
             yaw: 0.0,
             pitch: 0.0,
+            last_mouse_position: None,
         }
     }
 }
 
-impl FreeCameraController {
-    pub fn cursor_moved(&mut self, dx: f32, dy: f32) {
-        self.yaw += dx * CAMERA_SENSITIVITY;
-        self.pitch -= dy * CAMERA_SENSITIVITY;
-        self.pitch = self.pitch.clamp(-89.0, 89.0);
-    }
-
-    pub fn event(&mut self, event: &WindowEvent) {
+impl CameraController for FreeCameraController {
+    fn event(&mut self, event: WindowEvent) {
         match event {
+            WindowEvent::MouseMotion(position) => {
+                let position = Vec2::from(position);
+                if let Some(last_mouse_position) = &mut self.last_mouse_position {
+                    let (dx, dy) = (*last_mouse_position - position).into();
+                    self.yaw -= dx * CAMERA_SENSITIVITY;
+                    self.pitch += dy * CAMERA_SENSITIVITY;
+                    self.pitch = self.pitch.clamp(-89.0, 89.0);
+                    *last_mouse_position = position;
+                } else {
+                    self.last_mouse_position = Some(position);
+                }
+            }
+            WindowEvent::MouseLeft => {
+                self.last_mouse_position = None;
+            }
             WindowEvent::Scroll((_, val)) => {
                 if val.is_sign_positive() {
                     self.speed_multiplier += (CAMERA_SPEED_MAX - self.speed_multiplier) / 100.0;
@@ -238,7 +219,7 @@ impl FreeCameraController {
         }
     }
 
-    pub fn update(&mut self, object_position: &mut Vec3, object_direction: &mut Vec3, dt: f32) {
+    fn update(&mut self, object_position: &mut Vec3, object_direction: &mut Vec3, dt: f32) {
         let Self {
             right_pressed,
             left_pressed,

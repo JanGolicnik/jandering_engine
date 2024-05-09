@@ -69,10 +69,7 @@ pub trait Renderer {
 
     fn create_sampler(&mut self, desc: SamplerDescriptor) -> SamplerHandle;
 
-    fn create_bind_group(
-        &mut self,
-        bind_group: Box<dyn BindGroup + Send>,
-    ) -> UntypedBindGroupHandle;
+    fn create_bind_group(&mut self, bind_group: Box<dyn BindGroup>) -> UntypedBindGroupHandle;
 
     fn get_bind_group(&self, handle: UntypedBindGroupHandle) -> Option<&dyn BindGroup>;
 
@@ -130,7 +127,7 @@ pub trait RenderPass<'renderer> {
     ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
 }
 
-pub fn create_typed_bind_group<T: BindGroup + Send>(
+pub fn create_typed_bind_group<T: BindGroup>(
     renderer: &mut dyn Renderer,
     bind_group: T,
 ) -> BindGroupHandle<T> {

@@ -1,7 +1,7 @@
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
-    event::{KeyEvent, MouseButton, MouseScrollDelta, StartCause, Touch, WindowEvent},
+    event::{self, KeyEvent, MouseButton, MouseScrollDelta, StartCause, Touch, WindowEvent},
     keyboard::PhysicalKey,
     window::UserAttentionType,
 };
@@ -31,9 +31,27 @@ impl WinitWindow {
                 let window_builder = winit::window::WindowBuilder::new();
             }
         }
+
+        let (width, height) = match builder.resolution {
+            crate::core::window::WindowResolution::Exact { width, height } => (width, height),
+            crate::core::window::WindowResolution::Auto => {
+                cfg_if::cfg_if! {
+                    if #[cfg(target_arch = "wasm32")]{
+                        web_sys::window()
+                        .and_then(|win| win.screen().ok())
+                        .and_then(|screen| Some((screen.avail_width().unwrap_or(1) as u32, screen.avail_height().unwrap_or(1) as u32))
+                        ).unwrap_or((1,1))
+                    }else{
+                        let size = event_loop.primary_monitor().unwrap().size();
+                        (size.width, size.height)
+                    }
+                }
+            }
+        };
+
         let window = window_builder
             .with_title(builder.title)
-            .with_inner_size(winit::dpi::PhysicalSize::new(builder.width, builder.height))
+            .with_inner_size(winit::dpi::PhysicalSize::new(width, height))
             .build(&event_loop)
             .unwrap();
         window.set_cursor_visible(builder.show_cursor);
@@ -56,7 +74,7 @@ impl WinitWindow {
             should_close: false,
             is_init: true,
             ignore_next_resize: false,
-            size: (builder.width, builder.height),
+            size: (width, height),
         }
     }
 }
@@ -127,26 +145,28 @@ impl Window for WinitWindow {
                             WindowEvent::CursorLeft { .. } => {
                                 crate::core::window::WindowEvent::MouseLeft
                             }
-                            WindowEvent::Touch(Touch { location, .. }) => {
-                                event_handler.on_event(
-                                    crate::core::window::WindowEvent::MouseMotion((
-                                        location.x as f32,
-                                        location.y as f32,
-                                    )),
-                                    self,
-                                );
-                                event_handler.on_event(
+                            WindowEvent::Touch(Touch {
+                                location, phase, ..
+                            }) => match phase {
+                                event::TouchPhase::Started => {
                                     crate::core::window::WindowEvent::MouseInput {
                                         button: crate::core::window::MouseButton::Left,
                                         state: crate::core::window::InputState::Pressed,
-                                    },
-                                    self,
-                                );
-                                crate::core::window::WindowEvent::MouseInput {
-                                    button: crate::core::window::MouseButton::Left,
-                                    state: crate::core::window::InputState::Released,
+                                    }
                                 }
-                            }
+                                event::TouchPhase::Moved => {
+                                    crate::core::window::WindowEvent::MouseMotion((
+                                        location.x as f32,
+                                        location.y as f32,
+                                    ))
+                                }
+                                event::TouchPhase::Cancelled | event::TouchPhase::Ended => {
+                                    crate::core::window::WindowEvent::MouseInput {
+                                        button: crate::core::window::MouseButton::Left,
+                                        state: crate::core::window::InputState::Released,
+                                    }
+                                }
+                            },
                             WindowEvent::Resized(size) => {
                                 if self.is_init {
                                     self.ignore_next_resize = false;

@@ -2,7 +2,7 @@ use super::bind_group::BindGroupLayout;
 
 #[derive(Clone)]
 pub enum ShaderSource {
-    Code(&'static str),
+    Code(String),
 }
 
 #[derive(Clone)]
@@ -21,7 +21,7 @@ pub struct ShaderDescriptor {
 impl Default for ShaderDescriptor {
     fn default() -> Self {
         Self {
-            source: ShaderSource::Code(include_str!("default_shader.wgsl")),
+            source: ShaderSource::Code(include_str!("default_shader.wgsl").to_string()),
             descriptors: Vec::new(),
             bind_group_layouts: Vec::new(),
             vs_entry: "vs_main",
@@ -37,7 +37,7 @@ impl Default for ShaderDescriptor {
 impl ShaderDescriptor {
     pub fn flat() -> Self {
         Self {
-            source: ShaderSource::Code(include_str!("flat_shader.wgsl")),
+            source: ShaderSource::Code(include_str!("flat_shader.wgsl").to_string()),
             ..Default::default()
         }
     }

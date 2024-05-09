@@ -40,7 +40,7 @@ pub struct WGPURenderer {
     pub queue: wgpu::Queue,
     pub(crate) shaders: Vec<Shader>,
     shader_descriptors: Vec<ShaderDescriptor>,
-    bind_groups: Vec<Box<dyn BindGroup + Send>>,
+    bind_groups: Vec<Box<dyn BindGroup>>,
     bind_groups_render_data: Vec<BindGroupRenderData>,
     pub(crate) textures: Vec<Texture>,
     pub(crate) samplers: Vec<wgpu::Sampler>,
@@ -152,8 +152,8 @@ impl Renderer for WGPURenderer {
                 push_constant_ranges: &[],
             });
 
-        let code = match desc.source {
-            crate::core::shader::ShaderSource::Code(code) => code.to_string(),
+        let code = match &desc.source {
+            crate::core::shader::ShaderSource::Code(code) => code,
         };
 
         let shader = wgpu::ShaderModuleDescriptor {
@@ -396,10 +396,7 @@ impl Renderer for WGPURenderer {
             .write_buffer(&self.buffers[render_data.buffer_handle.0], 0, data);
     }
 
-    fn create_bind_group(
-        &mut self,
-        bind_group: Box<dyn BindGroup + Send>,
-    ) -> UntypedBindGroupHandle {
+    fn create_bind_group(&mut self, bind_group: Box<dyn BindGroup>) -> UntypedBindGroupHandle {
         {
             let layout = bind_group.get_layout(self);
             let bind_group_layout = Self::get_layout(&self.device, &layout);

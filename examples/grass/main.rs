@@ -3,7 +3,7 @@ use image::GenericImageView;
 use jandering_engine::{
     core::{
         bind_group::{
-            camera::free::FreeCameraBindGroup, texture::TextureBindGroup, BindGroup,
+            camera::free::MatrixCameraBindGroup, texture::TextureBindGroup, BindGroup,
             BindGroupLayout, BindGroupLayoutEntry,
         },
         engine::{Engine, EngineBuilder, EngineContext},
@@ -43,7 +43,7 @@ struct Application {
     heightmap_texture: BindGroupHandle<TextureBindGroup>,
     noise_texture: BindGroupHandle<TextureBindGroup>,
 
-    camera: BindGroupHandle<FreeCameraBindGroup>,
+    camera: BindGroupHandle<MatrixCameraBindGroup>,
     render_data: BindGroupHandle<RenderDataBindGroup>,
 
     multisample_texture: TextureHandle,
@@ -67,7 +67,7 @@ const MULTISAMPLE: u32 = 4;
 impl Application {
     pub async fn new(engine: &mut Engine) -> Self {
         let camera =
-            create_typed_bind_group(engine.renderer.as_mut(), FreeCameraBindGroup::default());
+            create_typed_bind_group(engine.renderer.as_mut(), MatrixCameraBindGroup::default());
         let render_data = RenderDataBindGroup::new(engine.renderer.as_mut());
         let render_data_bind_group_layout = render_data.get_layout(engine.renderer.as_mut());
 
@@ -75,7 +75,7 @@ impl Application {
             ShaderDescriptor::default()
                 .with_descriptors(vec![Vertex::desc()])
                 .with_bind_group_layouts(vec![
-                    FreeCameraBindGroup::get_layout(),
+                    MatrixCameraBindGroup::get_layout(),
                     render_data_bind_group_layout.clone(),
                     TextureBindGroup::get_layout(),
                     TextureBindGroup::get_layout(),
@@ -92,7 +92,7 @@ impl Application {
             ShaderDescriptor::default()
                 .with_descriptors(vec![Vertex::desc(), Instance::desc()])
                 .with_bind_group_layouts(vec![
-                    FreeCameraBindGroup::get_layout(),
+                    MatrixCameraBindGroup::get_layout(),
                     render_data_bind_group_layout.clone(),
                     TextureBindGroup::get_layout(),
                 ])
@@ -108,7 +108,7 @@ impl Application {
             ShaderDescriptor::default()
                 .with_descriptors(vec![Vertex::desc()])
                 .with_bind_group_layouts(vec![
-                    FreeCameraBindGroup::get_layout(),
+                    MatrixCameraBindGroup::get_layout(),
                     render_data_bind_group_layout.clone(),
                 ])
                 .with_backface_culling(true)

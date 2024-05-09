@@ -1,7 +1,12 @@
 use glam::Vec4Swizzles;
 use jandering_engine::{
     core::{
-        bind_group::{camera::free::FreeCameraBindGroup, BindGroup},
+        bind_group::{
+            camera::free::{
+                FreeCameraController, MatrixCameraBindGroup, PerspectiveCameraController,
+            },
+            BindGroup,
+        },
         engine::{Engine, EngineBuilder, EngineContext},
         event_handler::EventHandler,
         object::{Instance, Object, Vertex},
@@ -24,20 +29,33 @@ struct Application {
     susane: Object<Instance>,
     ground: Object<Instance>,
     shader: ShaderHandle,
-    camera: BindGroupHandle<FreeCameraBindGroup>,
+    camera: BindGroupHandle<MatrixCameraBindGroup>,
     is_in_fps: bool,
     depth_texture: TextureHandle,
 }
 
+const CAMERA_FOV: f32 = 45.0;
+const CAMEREA_NEAR: f32 = 0.01;
+const CAMEREA_FAR: f32 = 100000.0;
+
 impl Application {
     pub async fn new(engine: &mut Engine) -> Self {
-        let camera =
-            create_typed_bind_group(engine.renderer.as_mut(), FreeCameraBindGroup::default());
+        let resolution = engine.renderer.size();
+        let controller: Box<dyn PerspectiveCameraController> =
+            Box::<FreeCameraController>::default();
+        let mut camera = MatrixCameraBindGroup::with_controller(controller);
+        camera.make_perspective(
+            CAMERA_FOV,
+            resolution.x as f32 / resolution.y as f32,
+            CAMEREA_NEAR,
+            CAMEREA_FAR,
+        );
+        let camera = create_typed_bind_group(engine.renderer.as_mut(), camera);
 
         let shader = engine.renderer.create_shader(
             ShaderDescriptor::default()
                 .with_descriptors(vec![Vertex::desc(), Instance::desc()])
-                .with_bind_group_layouts(vec![FreeCameraBindGroup::get_layout()])
+                .with_bind_group_layouts(vec![MatrixCameraBindGroup::get_layout()])
                 .with_depth(true)
                 .with_backface_culling(false),
         );
@@ -133,6 +151,29 @@ impl EventHandler for Application {
         }) {
             self.is_in_fps = true;
             context.window.set_cursor_visible(false);
+        }
+
+        if context
+            .events
+            .iter()
+            .any(|e| matches!(e, WindowEvent::Resized(_)))
+        {
+            let resolution = context.renderer.size();
+            let camera = get_typed_bind_group_mut(context.renderer.as_mut(), self.camera).unwrap();
+            camera.make_perspective(
+                CAMERA_FOV,
+                resolution.x as f32 / resolution.y as f32,
+                CAMEREA_NEAR,
+                CAMEREA_FAR,
+            );
+            context.renderer.re_create_texture(
+                TextureDescriptor {
+                    size: context.renderer.size(),
+                    format: TextureFormat::Depth32F,
+                    ..Default::default()
+                },
+                self.depth_texture,
+            );
         }
 
         self.susane.instances.iter_mut().for_each(|e| {
