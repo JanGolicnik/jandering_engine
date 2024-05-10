@@ -6,9 +6,26 @@ pub enum ShaderSource {
 }
 
 #[derive(Clone)]
+pub enum BufferLayoutStepMode {
+    Vertex,
+    Instance,
+}
+
+#[derive(Clone)]
+pub struct BufferLayoutEntry {
+    pub size: u64,
+}
+
+#[derive(Clone)]
+pub struct BufferLayout {
+    pub step_mode: BufferLayoutStepMode,
+    pub entries: &'static [BufferLayoutEntry],
+}
+
+#[derive(Clone)]
 pub struct ShaderDescriptor {
     pub source: ShaderSource,
-    pub descriptors: Vec<wgpu::VertexBufferLayout<'static>>, //TODO: abstract this away so there is no dependency on wgpu
+    pub descriptors: Vec<BufferLayout>, //TODO: abstract this away so there is no dependency on wgpu
     pub bind_group_layouts: Vec<BindGroupLayout>,
     pub vs_entry: &'static str,
     pub fs_entry: &'static str,
@@ -44,7 +61,7 @@ impl ShaderDescriptor {
 }
 
 impl ShaderDescriptor {
-    pub fn with_descriptors(mut self, descriptors: Vec<wgpu::VertexBufferLayout<'static>>) -> Self {
+    pub fn with_descriptors(mut self, descriptors: Vec<BufferLayout>) -> Self {
         self.descriptors = descriptors;
         self
     }

@@ -167,6 +167,18 @@ impl Renderer for WGPURenderer {
             write_mask: wgpu::ColorWrites::ALL,
         })];
 
+        let attributes = desc
+            .descriptors
+            .iter()
+            .map(Self::get_buffer_attributes)
+            .collect::<Vec<_>>();
+        let buffers = desc
+            .descriptors
+            .iter()
+            .enumerate()
+            .map(|(i, e)| Self::get_buffer_layout(e.step_mode.clone(), &attributes[i]))
+            .collect::<Vec<_>>();
+
         let shader = self.device.create_shader_module(shader);
         let pipeline = self
             .device
@@ -176,7 +188,7 @@ impl Renderer for WGPURenderer {
                 vertex: wgpu::VertexState {
                     module: &shader,
                     entry_point: desc.vs_entry,
-                    buffers: &desc.descriptors,
+                    buffers: &buffers,
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
