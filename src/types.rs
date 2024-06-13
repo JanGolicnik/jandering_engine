@@ -10,6 +10,3 @@ pub type Mat3 = glam::Mat3;
 pub type Mat4 = glam::Mat4;
 
 pub type Qua = glam::Quat;
-
-pub const DEG_TO_RAD: f32 = 0.017453292;
-pub const RAD_TO_DEG: f32 = 57.29578;

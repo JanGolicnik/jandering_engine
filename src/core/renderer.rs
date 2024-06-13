@@ -9,21 +9,21 @@ use super::{
     texture::{sampler::SamplerDescriptor, Texture, TextureDescriptor},
 };
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct BufferHandle(pub usize);
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct TextureHandle(pub usize);
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct SamplerHandle(pub usize);
 
 pub struct BindGroupHandle<T>(pub usize, pub std::marker::PhantomData<T>);
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct UntypedBindGroupHandle(pub usize);
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct ShaderHandle(pub usize);
 
 pub trait Renderer {
@@ -69,6 +69,12 @@ pub trait Renderer {
 
     fn create_sampler(&mut self, desc: SamplerDescriptor) -> SamplerHandle;
 
+    fn create_bind_group_at(
+        &mut self,
+        bind_group: Box<dyn BindGroup>,
+        handle: UntypedBindGroupHandle,
+    );
+
     fn create_bind_group(&mut self, bind_group: Box<dyn BindGroup>) -> UntypedBindGroupHandle;
 
     fn get_bind_group(&self, handle: UntypedBindGroupHandle) -> Option<&dyn BindGroup>;
@@ -76,12 +82,19 @@ pub trait Renderer {
     fn get_bind_group_mut(&mut self, handle: UntypedBindGroupHandle) -> Option<&mut dyn BindGroup>;
 
     fn write_bind_group(&mut self, handle: UntypedBindGroupHandle, data: &[u8]);
+
+    fn max_texture_size(&self) -> UVec2;
 }
 
 pub trait RenderPass<'renderer> {
     fn render(
         self: Box<Self>,
         renderables: &[&dyn Renderable],
+    ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
+
+    fn render_one(
+        self: Box<Self>,
+        renderable: &dyn Renderable,
     ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
 
     fn render_range(
@@ -125,6 +138,14 @@ pub trait RenderPass<'renderer> {
         target: TextureHandle,
         resolve: Option<TextureHandle>,
     ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
+}
+
+pub fn create_typed_bind_group_at<T: BindGroup>(
+    renderer: &mut dyn Renderer,
+    bind_group: T,
+    handle: BindGroupHandle<T>,
+) {
+    renderer.create_bind_group_at(Box::new(bind_group), handle.into());
 }
 
 pub fn create_typed_bind_group<T: BindGroup>(

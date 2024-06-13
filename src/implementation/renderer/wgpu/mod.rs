@@ -46,6 +46,7 @@ pub struct WGPURenderer {
     pub(crate) samplers: Vec<wgpu::Sampler>,
     pub(crate) buffers: Vec<wgpu::Buffer>,
     pub(crate) surface_data: Option<(wgpu::SurfaceTexture, wgpu::TextureView)>,
+    limits: wgpu::Limits,
 }
 
 impl Renderer for WGPURenderer {
@@ -152,9 +153,7 @@ impl Renderer for WGPURenderer {
                 push_constant_ranges: &[],
             });
 
-        let code = match &desc.source {
-            crate::core::shader::ShaderSource::Code(code) => code,
-        };
+        let crate::core::shader::ShaderSource::Code(code) = &desc.source;
 
         let shader = wgpu::ShaderModuleDescriptor {
             label: Some("Shader"),
@@ -172,12 +171,7 @@ impl Renderer for WGPURenderer {
             .iter()
             .map(Self::get_buffer_attributes)
             .collect::<Vec<_>>();
-        let buffers = desc
-            .descriptors
-            .iter()
-            .enumerate()
-            .map(|(i, e)| Self::get_buffer_layout(e.step_mode.clone(), &attributes[i]))
-            .collect::<Vec<_>>();
+        let buffers = Self::get_buffer_layouts(&attributes, &desc.descriptors);
 
         let shader = self.device.create_shader_module(shader);
         let pipeline = self
@@ -408,7 +402,11 @@ impl Renderer for WGPURenderer {
             .write_buffer(&self.buffers[render_data.buffer_handle.0], 0, data);
     }
 
-    fn create_bind_group(&mut self, bind_group: Box<dyn BindGroup>) -> UntypedBindGroupHandle {
+    fn create_bind_group_at(
+        &mut self,
+        bind_group: Box<dyn BindGroup>,
+        handle: UntypedBindGroupHandle,
+    ) {
         {
             let layout = bind_group.get_layout(self);
             let bind_group_layout = Self::get_layout(&self.device, &layout);
@@ -440,25 +438,39 @@ impl Renderer for WGPURenderer {
                 label: Some("bind_group"),
             });
 
-            self.bind_groups_render_data.push(BindGroupRenderData {
+            let data = BindGroupRenderData {
                 bind_group,
                 buffer_handle: first_handle,
-            });
+            };
+
+            if handle.0 >= self.bind_groups.len() {
+                self.bind_groups_render_data.push(data);
+            } else {
+                self.bind_groups_render_data[handle.0] = data;
+            }
         }
 
-        self.bind_groups.push(bind_group);
-        UntypedBindGroupHandle(self.bind_groups.len() - 1)
+        if handle.0 >= self.bind_groups.len() {
+            self.bind_groups.push(bind_group);
+        } else {
+            self.bind_groups[handle.0] = bind_group;
+        }
+    }
+
+    fn create_bind_group(&mut self, bind_group: Box<dyn BindGroup>) -> UntypedBindGroupHandle {
+        let handle = UntypedBindGroupHandle(self.bind_groups.len());
+        self.create_bind_group_at(bind_group, handle);
+        handle
+    }
+
+    fn max_texture_size(&self) -> UVec2 {
+        UVec2::splat(self.limits.max_texture_dimension_2d)
     }
 }
 
 impl WGPURenderer {
     #[allow(clippy::borrowed_box)]
     pub async fn new(window: &Box<dyn Window>) -> Self {
-        let (width, height) = {
-            let size = window.size();
-            (size.0, size.1)
-        };
-
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
             ..Default::default()
@@ -474,15 +486,23 @@ impl WGPURenderer {
             })
             .await
             .unwrap();
+
+        let limits = if cfg!(target_arch = "wasm32") {
+            wgpu::Limits::downlevel_webgl2_defaults()
+        } else {
+            wgpu::Limits::default()
+        };
+
+        let (width, height) = {
+            let size = window.size();
+            (size.0, size.1)
+        };
+
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
                     features: wgpu::Features::empty(),
-                    limits: if cfg!(target_arch = "wasm32") {
-                        wgpu::Limits::downlevel_webgl2_defaults()
-                    } else {
-                        wgpu::Limits::default()
-                    },
+                    limits: limits.clone(),
                     label: None,
                 },
                 None,
@@ -524,6 +544,7 @@ impl WGPURenderer {
             bind_groups_render_data: Vec::new(),
             buffers: Vec::new(),
             surface_data: None,
+            limits,
         }
     }
 }

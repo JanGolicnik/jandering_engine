@@ -7,8 +7,6 @@ pub trait Window {
 
     fn size(&self) -> (u32, u32);
 
-    fn run(&mut self, event_handler: Box<dyn WindowEventHandler>);
-
     fn width(&self) -> u32;
 
     fn height(&self) -> u32;
@@ -39,20 +37,20 @@ pub trait Window {
 
     fn request_user_attention(&mut self);
 
-    fn get_raw_window_handle(&self) -> raw_window_handle::RawWindowHandle;
+    fn get_raw_window_handle(&self) -> Option<raw_window_handle::RawWindowHandle>;
 
-    fn get_raw_display_handle(&self) -> raw_window_handle::RawDisplayHandle;
+    fn get_raw_display_handle(&self) -> Option<raw_window_handle::RawDisplayHandle>;
 }
 
 unsafe impl raw_window_handle::HasRawWindowHandle for dyn Window {
     fn raw_window_handle(&self) -> raw_window_handle::RawWindowHandle {
-        self.get_raw_window_handle()
+        self.get_raw_window_handle().unwrap()
     }
 }
 
 unsafe impl raw_window_handle::HasRawDisplayHandle for dyn Window {
     fn raw_display_handle(&self) -> raw_window_handle::RawDisplayHandle {
-        self.get_raw_display_handle()
+        self.get_raw_display_handle().unwrap()
     }
 }
 
@@ -205,13 +203,13 @@ pub enum WindowResolution {
     Auto,
 }
 
-pub struct WindowBuilder {
+pub struct WindowConfig {
     pub title: &'static str,
     pub resolution: WindowResolution,
     pub show_cursor: bool,
 }
 
-impl Default for WindowBuilder {
+impl Default for WindowConfig {
     fn default() -> Self {
         Self {
             resolution: WindowResolution::Auto,
@@ -221,7 +219,7 @@ impl Default for WindowBuilder {
     }
 }
 
-impl WindowBuilder {
+impl WindowConfig {
     pub fn with_resolution(mut self, w: u32, h: u32) -> Self {
         self.resolution = WindowResolution::Exact {
             width: w,
@@ -245,4 +243,6 @@ impl WindowBuilder {
 
 pub trait WindowEventHandler {
     fn on_event(&mut self, event: WindowEvent, window: &mut dyn Window);
+
+    fn window_created(&mut self, window: &mut dyn Window);
 }

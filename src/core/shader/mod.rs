@@ -11,9 +11,31 @@ pub enum BufferLayoutStepMode {
     Instance,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
+pub enum BufferLayoutEntryDataType {
+    Float32,
+    Float32x2,
+    Float32x3,
+    Float32x4,
+
+    U32,
+}
+
+#[derive(Clone, Copy)]
 pub struct BufferLayoutEntry {
-    pub size: u64,
+    pub location: u32,
+    pub data_type: BufferLayoutEntryDataType,
+}
+
+impl BufferLayoutEntryDataType {
+    pub fn size_bytes(&self) -> u64 {
+        match self {
+            BufferLayoutEntryDataType::Float32 | BufferLayoutEntryDataType::U32 => 4,
+            BufferLayoutEntryDataType::Float32x2 => 8,
+            BufferLayoutEntryDataType::Float32x3 => 12,
+            BufferLayoutEntryDataType::Float32x4 => 16,
+        }
+    }
 }
 
 #[derive(Clone)]

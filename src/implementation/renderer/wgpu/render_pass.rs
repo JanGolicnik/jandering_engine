@@ -56,6 +56,15 @@ impl<'renderer> RenderPass<'renderer> for WGPURenderPass<'renderer> {
         ret
     }
 
+    fn render_one(
+        self: Box<Self>,
+        renderable: &dyn Renderable,
+    ) -> Box<dyn RenderPass<'renderer> + 'renderer> {
+        let mut ret: Box<dyn RenderPass<'renderer> + 'renderer> = self;
+        ret = ret.render_range(renderable, 0..renderable.num_instances());
+        ret
+    }
+
     fn render_range(
         mut self: Box<Self>,
         renderable: &dyn Renderable,

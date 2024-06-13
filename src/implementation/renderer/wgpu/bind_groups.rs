@@ -1,9 +1,9 @@
-use wgpu::{Buffer, VertexAttribute};
+use wgpu::VertexAttribute;
 
 use crate::core::{
     bind_group::{BindGroupLayout, BindGroupLayoutEntry},
     renderer::{BindGroupHandle, UntypedBindGroupHandle},
-    shader::{BufferLayout, BufferLayoutStepMode},
+    shader::BufferLayout,
 };
 
 use super::WGPURenderer;
@@ -62,52 +62,68 @@ impl WGPURenderer {
     pub fn get_buffer_attributes(layout: &BufferLayout) -> Vec<VertexAttribute> {
         let mut entries = Vec::new();
         let mut offset = 0;
-        for (shader_location, entry) in layout.entries.iter().enumerate() {
+        for entry in layout.entries.iter() {
             entries.push(wgpu::VertexAttribute {
-                format: match entry.size {
-                    1 => wgpu::VertexFormat::Float32,
-                    2 => wgpu::VertexFormat::Float32x2,
-                    3 => wgpu::VertexFormat::Float32x3,
-                    4 => wgpu::VertexFormat::Float32x4,
-                    _ => panic!(),
+                format: match entry.data_type {
+                    crate::core::shader::BufferLayoutEntryDataType::Float32 => {
+                        wgpu::VertexFormat::Float32
+                    }
+                    crate::core::shader::BufferLayoutEntryDataType::Float32x2 => {
+                        wgpu::VertexFormat::Float32x2
+                    }
+                    crate::core::shader::BufferLayoutEntryDataType::Float32x3 => {
+                        wgpu::VertexFormat::Float32x3
+                    }
+                    crate::core::shader::BufferLayoutEntryDataType::Float32x4 => {
+                        wgpu::VertexFormat::Float32x4
+                    }
+                    crate::core::shader::BufferLayoutEntryDataType::U32 => {
+                        wgpu::VertexFormat::Uint32
+                    }
                 },
                 offset,
-                shader_location: shader_location as u32,
+                shader_location: entry.location,
             });
-            offset += entry.size;
+            offset += entry.data_type.size_bytes();
         }
         entries
     }
 
-    pub fn get_buffer_layout<'a>(
-        step_mode: BufferLayoutStepMode,
-        entries: &'a [VertexAttribute],
-    ) -> wgpu::VertexBufferLayout<'a> {
-        if let Some(last) = entries.last() {
-            let offset = last.offset
-                + 4 * match last.format {
-                    wgpu::VertexFormat::Float32 => 1,
-                    wgpu::VertexFormat::Float32x2 => 2,
-                    wgpu::VertexFormat::Float32x3 => 3,
-                    wgpu::VertexFormat::Float32x4 => 4,
-                    _ => panic!(),
-                };
+    pub fn get_buffer_layouts<'a>(
+        entries: &'a [Vec<VertexAttribute>],
+        layouts: &[BufferLayout],
+    ) -> Vec<wgpu::VertexBufferLayout<'a>> {
+        layouts
+            .iter()
+            .enumerate()
+            .map(|(i, e)| {
+                if let Some(last) = entries[i].last() {
+                    let offset = last.offset
+                        + 4 * match last.format {
+                            wgpu::VertexFormat::Float32 => 1,
+                            wgpu::VertexFormat::Float32x2 => 2,
+                            wgpu::VertexFormat::Float32x3 => 3,
+                            wgpu::VertexFormat::Float32x4 => 4,
+                            _ => panic!(),
+                        };
 
-            wgpu::VertexBufferLayout {
-                array_stride: offset as wgpu::BufferAddress,
-                step_mode: match step_mode {
-                    crate::core::shader::BufferLayoutStepMode::Vertex => {
-                        wgpu::VertexStepMode::Vertex
+                    wgpu::VertexBufferLayout {
+                        array_stride: offset as wgpu::BufferAddress,
+                        step_mode: match e.step_mode {
+                            crate::core::shader::BufferLayoutStepMode::Vertex => {
+                                wgpu::VertexStepMode::Vertex
+                            }
+                            crate::core::shader::BufferLayoutStepMode::Instance => {
+                                wgpu::VertexStepMode::Instance
+                            }
+                        },
+                        attributes: &entries[i],
                     }
-                    crate::core::shader::BufferLayoutStepMode::Instance => {
-                        wgpu::VertexStepMode::Instance
-                    }
-                },
-                attributes: &entries,
-            }
-        } else {
-            panic!()
-        }
+                } else {
+                    panic!()
+                }
+            })
+            .collect()
     }
 }
 

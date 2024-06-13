@@ -1,8 +1,11 @@
-use crate::{types::*, utils::load_obj};
+use crate::{core::shader::BufferLayoutEntryDataType, types::*, utils::load_obj};
 
 use self::primitives::{quad_data, triangle_data};
 
-use super::renderer::{BufferHandle, Renderer};
+use super::{
+    renderer::{BufferHandle, Renderer},
+    shader::{BufferLayout, BufferLayoutEntry},
+};
 
 pub mod primitives;
 
@@ -14,6 +17,7 @@ pub struct Vertex {
     pub uv: Vec2,
 }
 
+#[derive(Debug)]
 pub struct ObjectRenderData {
     pub vertex_buffer: BufferHandle,
     //
@@ -35,27 +39,21 @@ pub struct Object<T> {
 }
 
 impl Vertex {
-    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
-        use std::mem;
-
-        wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<Vertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x3,
+    pub fn desc() -> BufferLayout {
+        BufferLayout {
+            step_mode: crate::core::shader::BufferLayoutStepMode::Vertex,
+            entries: &[
+                BufferLayoutEntry {
+                    location: 0,
+                    data_type: BufferLayoutEntryDataType::Float32x3,
                 },
-                wgpu::VertexAttribute {
-                    offset: mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                    shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x3,
+                BufferLayoutEntry {
+                    location: 1,
+                    data_type: BufferLayoutEntryDataType::Float32x3,
                 },
-                wgpu::VertexAttribute {
-                    offset: mem::size_of::<[f32; 6]>() as wgpu::BufferAddress,
-                    shader_location: 2,
-                    format: wgpu::VertexFormat::Float32x2,
+                BufferLayoutEntry {
+                    location: 2,
+                    data_type: BufferLayoutEntryDataType::Float32x2,
                 },
             ],
         }
@@ -63,7 +61,7 @@ impl Vertex {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Copy, Debug, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Instance {
     pub model: Mat4,
     pub inv_model: Mat4,
@@ -79,55 +77,51 @@ impl Default for Instance {
 }
 
 impl Instance {
-    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
-        use std::mem;
-
-        wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<Instance>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Instance,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 5,
-                    format: wgpu::VertexFormat::Float32x4,
+    pub fn desc() -> BufferLayout {
+        BufferLayout {
+            step_mode: crate::core::shader::BufferLayoutStepMode::Instance,
+            entries: &[
+                BufferLayoutEntry {
+                    location: 5,
+                    data_type: BufferLayoutEntryDataType::Float32x4,
                 },
-                wgpu::VertexAttribute {
-                    offset: mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
-                    shader_location: 6,
-                    format: wgpu::VertexFormat::Float32x4,
+                BufferLayoutEntry {
+                    location: 6,
+                    data_type: BufferLayoutEntryDataType::Float32x4,
                 },
-                wgpu::VertexAttribute {
-                    offset: mem::size_of::<[f32; 8]>() as wgpu::BufferAddress,
-                    shader_location: 7,
-                    format: wgpu::VertexFormat::Float32x4,
+                BufferLayoutEntry {
+                    location: 7,
+                    data_type: BufferLayoutEntryDataType::Float32x4,
                 },
-                wgpu::VertexAttribute {
-                    offset: mem::size_of::<[f32; 12]>() as wgpu::BufferAddress,
-                    shader_location: 8,
-                    format: wgpu::VertexFormat::Float32x4,
+                BufferLayoutEntry {
+                    location: 8,
+                    data_type: BufferLayoutEntryDataType::Float32x4,
                 },
-                wgpu::VertexAttribute {
-                    offset: mem::size_of::<[f32; 16]>() as wgpu::BufferAddress,
-                    shader_location: 9,
-                    format: wgpu::VertexFormat::Float32x4,
+                BufferLayoutEntry {
+                    location: 9,
+                    data_type: BufferLayoutEntryDataType::Float32x4,
                 },
-                wgpu::VertexAttribute {
-                    offset: mem::size_of::<[f32; 20]>() as wgpu::BufferAddress,
-                    shader_location: 10,
-                    format: wgpu::VertexFormat::Float32x4,
+                BufferLayoutEntry {
+                    location: 10,
+                    data_type: BufferLayoutEntryDataType::Float32x4,
                 },
-                wgpu::VertexAttribute {
-                    offset: mem::size_of::<[f32; 24]>() as wgpu::BufferAddress,
-                    shader_location: 11,
-                    format: wgpu::VertexFormat::Float32x4,
+                BufferLayoutEntry {
+                    location: 11,
+                    data_type: BufferLayoutEntryDataType::Float32x4,
                 },
-                wgpu::VertexAttribute {
-                    offset: mem::size_of::<[f32; 28]>() as wgpu::BufferAddress,
-                    shader_location: 12,
-                    format: wgpu::VertexFormat::Float32x4,
+                BufferLayoutEntry {
+                    location: 12,
+                    data_type: BufferLayoutEntryDataType::Float32x4,
                 },
             ],
         }
+    }
+
+    pub fn set_position(mut self, pos: Vec3) -> Self {
+        let (scale, rotation, _) = self.model.to_scale_rotation_translation();
+        self.model = Mat4::from_scale_rotation_translation(scale, rotation, pos);
+        self.inv_model = self.model.inverse();
+        self
     }
 
     pub fn translate(mut self, pos: Vec3) -> Self {
@@ -137,19 +131,42 @@ impl Instance {
         self
     }
 
-    pub fn rotate(mut self, angle: f32, axis: Vec3) -> Self {
-        let rotation_mat = Mat4::from_axis_angle(axis, angle);
+    pub fn rotate(mut self, angle_rad: f32, axis: Vec3) -> Self {
+        let rotation_mat = Mat4::from_axis_angle(axis, angle_rad);
         self.model = rotation_mat * self.model;
         self.inv_model = self.model.inverse();
         self
     }
 
-    pub fn scale(mut self, new_scale: f32) -> Self {
+    pub fn resize(mut self, size: f32) -> Self {
         let (scale, rotation, translation) = self.model.to_scale_rotation_translation();
-        self.model =
-            Mat4::from_scale_rotation_translation(scale + new_scale, rotation, translation);
+        self.model = Mat4::from_scale_rotation_translation(scale + size, rotation, translation);
         self.inv_model = self.model.inverse();
         self
+    }
+
+    pub fn set_size(mut self, size: Vec3) -> Self {
+        let (_, rotation, translation) = self.model.to_scale_rotation_translation();
+        self.model = Mat4::from_scale_rotation_translation(size, rotation, translation);
+        self.inv_model = self.model.inverse();
+        self
+    }
+
+    pub fn position(&self) -> Vec3 {
+        self.model.to_scale_rotation_translation().2
+    }
+
+    pub fn rotation(&self) -> Qua {
+        self.model.to_scale_rotation_translation().1
+    }
+
+    pub fn mat(&self) -> Mat4 {
+        self.model
+    }
+
+    pub fn set_mat(&mut self, mat: Mat4) {
+        self.model = mat;
+        self.inv_model = self.model.inverse();
     }
 }
 

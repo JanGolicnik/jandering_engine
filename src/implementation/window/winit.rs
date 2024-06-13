@@ -1,38 +1,52 @@
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 use winit::{
+    application::ApplicationHandler,
     dpi::{PhysicalPosition, PhysicalSize},
-    event::{self, KeyEvent, MouseButton, MouseScrollDelta, StartCause, Touch, WindowEvent},
+    event::{self, KeyEvent, MouseButton, MouseScrollDelta, Touch, WindowEvent},
     keyboard::PhysicalKey,
     window::UserAttentionType,
 };
 
-use crate::core::window::{Window, WindowBuilder, WindowEventHandler};
+use crate::core::window::{Window, WindowConfig, WindowEventHandler};
 
 #[cfg(target_arch = "wasm32")]
 use winit::platform::web::WindowExtWebSys;
 
 pub struct WinitWindow {
-    event_loop: Option<winit::event_loop::EventLoop<()>>,
-    window: winit::window::Window,
+    window: Option<winit::window::Window>,
     should_close: bool,
     ignore_next_resize: bool,
     is_init: bool,
     size: (u32, u32),
+    config: WindowConfig,
+    event_handler: Option<Box<dyn WindowEventHandler>>,
 }
 
 impl WinitWindow {
-    pub fn new(builder: WindowBuilder) -> Self {
+    pub fn run(config: WindowConfig, event_handler: Box<dyn WindowEventHandler>) {
         let event_loop = winit::event_loop::EventLoop::new().unwrap();
-        cfg_if::cfg_if! {
-            if #[cfg(target_arch = "wasm32")] {
-                use winit::platform::web::WindowBuilderExtWebSys;
-                let window_builder = winit::window::WindowBuilder::new().with_prevent_default(true);
-            } else {
-                let window_builder = winit::window::WindowBuilder::new();
-            }
+        let mut this = Self {
+            window: None,
+            should_close: false,
+            ignore_next_resize: false,
+            is_init: true,
+            size: (0, 0),
+            config,
+            event_handler: Some(event_handler),
+        };
+        event_loop.run_app(&mut this).unwrap();
+    }
+
+    fn create_window(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        let mut window_attributes = winit::window::Window::default_attributes();
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            use winit::platform::web::WindowBuilderExtWebSys;
+            window_attributes = window_attributes.with_prevent_default(true);
         }
 
-        let (width, height) = match builder.resolution {
+        self.size = match self.config.resolution {
             crate::core::window::WindowResolution::Exact { width, height } => (width, height),
             crate::core::window::WindowResolution::Auto => {
                 cfg_if::cfg_if! {
@@ -49,12 +63,12 @@ impl WinitWindow {
             }
         };
 
-        let window = window_builder
-            .with_title(builder.title)
-            .with_inner_size(winit::dpi::PhysicalSize::new(width, height))
-            .build(&event_loop)
-            .unwrap();
-        window.set_cursor_visible(builder.show_cursor);
+        window_attributes = window_attributes
+            .with_title(self.config.title)
+            .with_inner_size(winit::dpi::PhysicalSize::new(self.size.0, self.size.1));
+
+        let window = event_loop.create_window(window_attributes).unwrap();
+        window.set_cursor_visible(self.config.show_cursor);
         #[cfg(target_arch = "wasm32")]
         {
             web_sys::window()
@@ -68,27 +82,149 @@ impl WinitWindow {
                 .expect("coulnt append canvas to document body");
         }
 
-        Self {
-            event_loop: Some(event_loop),
-            window,
-            should_close: false,
-            is_init: true,
-            ignore_next_resize: false,
-            size: (width, height),
+        self.window = Some(window);
+
+        let mut event_handler = self.event_handler.take().unwrap();
+        event_handler.window_created(self);
+        self.event_handler = Some(event_handler);
+    }
+
+    fn handle_event(
+        &mut self,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        event: winit::event::WindowEvent,
+    ) {
+        if event_loop.exiting() {
+            return;
         }
+
+        if !matches!(
+            event_loop.control_flow(),
+            winit::event_loop::ControlFlow::Poll
+        ) {
+            event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
+        }
+
+        let event = match event {
+            WindowEvent::CursorEntered { .. } => crate::core::window::WindowEvent::MouseEntered,
+            WindowEvent::CursorLeft { .. } => crate::core::window::WindowEvent::MouseLeft,
+            WindowEvent::Touch(Touch {
+                location, phase, ..
+            }) => match phase {
+                event::TouchPhase::Started => crate::core::window::WindowEvent::MouseInput {
+                    button: crate::core::window::MouseButton::Left,
+                    state: crate::core::window::InputState::Pressed,
+                },
+                event::TouchPhase::Moved => crate::core::window::WindowEvent::MouseMotion((
+                    location.x as f32,
+                    location.y as f32,
+                )),
+                event::TouchPhase::Cancelled | event::TouchPhase::Ended => {
+                    crate::core::window::WindowEvent::MouseInput {
+                        button: crate::core::window::MouseButton::Left,
+                        state: crate::core::window::InputState::Released,
+                    }
+                }
+            },
+            WindowEvent::Resized(size) => {
+                if self.is_init {
+                    self.ignore_next_resize = false;
+                    return;
+                }
+                crate::core::window::WindowEvent::Resized((size.width, size.height))
+            }
+            WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
+                crate::core::window::WindowEvent::Resized((
+                    ((self.width() as f64 * scale_factor) as u32),
+                    (self.height() as f64 * scale_factor) as u32,
+                ))
+            }
+            WindowEvent::CloseRequested => crate::core::window::WindowEvent::CloseRequested,
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        physical_key: PhysicalKey::Code(key_code),
+                        state,
+                        ..
+                    },
+                ..
+            } => crate::core::window::WindowEvent::KeyInput {
+                key: winit_key_to_window_key(key_code),
+                state: match state {
+                    winit::event::ElementState::Pressed => crate::core::window::InputState::Pressed,
+                    winit::event::ElementState::Released => {
+                        crate::core::window::InputState::Released
+                    }
+                },
+            },
+            WindowEvent::CursorMoved { position, .. } => {
+                crate::core::window::WindowEvent::MouseMotion((
+                    position.x as f32,
+                    position.y as f32,
+                ))
+            }
+            WindowEvent::MouseWheel {
+                delta: MouseScrollDelta::LineDelta(x, y),
+                ..
+            } => crate::core::window::WindowEvent::Scroll((x, y)),
+            WindowEvent::MouseWheel {
+                delta: MouseScrollDelta::PixelDelta(pos),
+                ..
+            } => crate::core::window::WindowEvent::Scroll((
+                if pos.x.is_sign_positive() { 1.0 } else { -1.0 },
+                if pos.y.is_sign_positive() { 1.0 } else { -1.0 },
+            )),
+            WindowEvent::MouseInput { state, button, .. } => {
+                crate::core::window::WindowEvent::MouseInput {
+                    button: match button {
+                        MouseButton::Left => crate::core::window::MouseButton::Left,
+                        MouseButton::Right => crate::core::window::MouseButton::Right,
+                        MouseButton::Middle => crate::core::window::MouseButton::Middle,
+                        _ => crate::core::window::MouseButton::Unknown,
+                    },
+                    state: match state {
+                        winit::event::ElementState::Pressed => {
+                            crate::core::window::InputState::Pressed
+                        }
+                        winit::event::ElementState::Released => {
+                            crate::core::window::InputState::Released
+                        }
+                    },
+                }
+            }
+            WindowEvent::RedrawRequested => crate::core::window::WindowEvent::RedrawRequested,
+            _ => {
+                return;
+            }
+        };
+
+        let mut event_handler = self.event_handler.take().unwrap();
+        event_handler.on_event(event, self);
+        self.event_handler = Some(event_handler);
     }
 }
 
+// winit::event::Event::NewEvents(cause) => {
+//     self.is_init = cause == StartCause::Init;
+// }
+// winit::event::Event::AboutToWait => {
+//     event_handler.on_event(crate::core::window::WindowEvent::EventsCleared, self);
+// }
+// _ => {}
+
 impl Window for WinitWindow {
     fn resize(&mut self, width: u32, height: u32) {
-        self.ignore_next_resize = self
-            .window
-            .request_inner_size(PhysicalSize::new(width, height))
-            .is_none();
+        if let Some(window) = self.window.as_mut() {
+            self.ignore_next_resize = window
+                .request_inner_size(PhysicalSize::new(width, height))
+                .is_none();
+        }
     }
 
     fn set_cursor_position(&self, x: u32, y: u32) {
-        let _ = self.window.set_cursor_position(PhysicalPosition::new(x, y));
+        if let Some(window) = self.window.as_ref() {
+            let _ = window.set_cursor_position(PhysicalPosition::new(x, y));
+        }
     }
 
     fn size(&self) -> (u32, u32) {
@@ -104,214 +240,93 @@ impl Window for WinitWindow {
     }
 
     fn request_redraw(&mut self) {
-        self.window.request_redraw();
+        if let Some(window) = self.window.as_mut() {
+            window.request_redraw();
+        }
     }
 
     fn close(&mut self) {
         self.should_close = true;
     }
 
-    fn get_raw_window_handle(&self) -> raw_window_handle::RawWindowHandle {
-        self.window.raw_window_handle()
+    fn get_raw_window_handle(&self) -> Option<raw_window_handle::RawWindowHandle> {
+        Some(self.window.as_ref()?.raw_window_handle())
     }
 
-    fn get_raw_display_handle(&self) -> raw_window_handle::RawDisplayHandle {
-        self.window.raw_display_handle()
-    }
-
-    fn run(&mut self, mut event_handler: Box<dyn WindowEventHandler>) {
-        let event_loop = self.event_loop.take().unwrap();
-        event_loop
-            .run(|e, target| {
-                if self.should_close {
-                    target.exit();
-                }
-                if target.exiting() {
-                    return;
-                }
-
-                if !matches!(target.control_flow(), winit::event_loop::ControlFlow::Poll) {
-                    target.set_control_flow(winit::event_loop::ControlFlow::Poll);
-                }
-                match e {
-                    winit::event::Event::WindowEvent { window_id, event } => {
-                        if window_id != self.window.id() {
-                            return;
-                        }
-                        let event = match event {
-                            WindowEvent::CursorEntered { .. } => {
-                                crate::core::window::WindowEvent::MouseEntered
-                            }
-                            WindowEvent::CursorLeft { .. } => {
-                                crate::core::window::WindowEvent::MouseLeft
-                            }
-                            WindowEvent::Touch(Touch {
-                                location, phase, ..
-                            }) => match phase {
-                                event::TouchPhase::Started => {
-                                    crate::core::window::WindowEvent::MouseInput {
-                                        button: crate::core::window::MouseButton::Left,
-                                        state: crate::core::window::InputState::Pressed,
-                                    }
-                                }
-                                event::TouchPhase::Moved => {
-                                    crate::core::window::WindowEvent::MouseMotion((
-                                        location.x as f32,
-                                        location.y as f32,
-                                    ))
-                                }
-                                event::TouchPhase::Cancelled | event::TouchPhase::Ended => {
-                                    crate::core::window::WindowEvent::MouseInput {
-                                        button: crate::core::window::MouseButton::Left,
-                                        state: crate::core::window::InputState::Released,
-                                    }
-                                }
-                            },
-                            WindowEvent::Resized(size) => {
-                                if self.is_init {
-                                    self.ignore_next_resize = false;
-                                    return;
-                                }
-                                crate::core::window::WindowEvent::Resized((size.width, size.height))
-                            }
-                            WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
-                                crate::core::window::WindowEvent::Resized((
-                                    ((self.width() as f64 * scale_factor) as u32),
-                                    (self.height() as f64 * scale_factor) as u32,
-                                ))
-                            }
-                            WindowEvent::CloseRequested => {
-                                crate::core::window::WindowEvent::CloseRequested
-                            }
-                            WindowEvent::KeyboardInput {
-                                event:
-                                    KeyEvent {
-                                        physical_key: PhysicalKey::Code(key_code),
-                                        state,
-                                        ..
-                                    },
-                                ..
-                            } => crate::core::window::WindowEvent::KeyInput {
-                                key: winit_key_to_window_key(key_code),
-                                state: match state {
-                                    winit::event::ElementState::Pressed => {
-                                        crate::core::window::InputState::Pressed
-                                    }
-                                    winit::event::ElementState::Released => {
-                                        crate::core::window::InputState::Released
-                                    }
-                                },
-                            },
-                            WindowEvent::CursorMoved { position, .. } => {
-                                crate::core::window::WindowEvent::MouseMotion((
-                                    position.x as f32,
-                                    position.y as f32,
-                                ))
-                            }
-                            WindowEvent::MouseWheel {
-                                delta: MouseScrollDelta::LineDelta(x, y),
-                                ..
-                            } => crate::core::window::WindowEvent::Scroll((x, y)),
-                            WindowEvent::MouseWheel {
-                                delta: MouseScrollDelta::PixelDelta(pos),
-                                ..
-                            } => crate::core::window::WindowEvent::Scroll((
-                                if pos.x.is_sign_positive() { 1.0 } else { -1.0 },
-                                if pos.y.is_sign_positive() { 1.0 } else { -1.0 },
-                            )),
-                            WindowEvent::MouseInput { state, button, .. } => {
-                                crate::core::window::WindowEvent::MouseInput {
-                                    button: match button {
-                                        MouseButton::Left => crate::core::window::MouseButton::Left,
-                                        MouseButton::Right => {
-                                            crate::core::window::MouseButton::Right
-                                        }
-                                        MouseButton::Middle => {
-                                            crate::core::window::MouseButton::Middle
-                                        }
-                                        _ => crate::core::window::MouseButton::Unknown,
-                                    },
-                                    state: match state {
-                                        winit::event::ElementState::Pressed => {
-                                            crate::core::window::InputState::Pressed
-                                        }
-                                        winit::event::ElementState::Released => {
-                                            crate::core::window::InputState::Released
-                                        }
-                                    },
-                                }
-                            }
-                            WindowEvent::RedrawRequested => {
-                                crate::core::window::WindowEvent::RedrawRequested
-                            }
-                            _ => {
-                                return;
-                            }
-                        };
-                        event_handler.on_event(event, self);
-                    }
-                    winit::event::Event::NewEvents(cause) => {
-                        self.is_init = cause == StartCause::Init;
-                    }
-                    winit::event::Event::AboutToWait => {
-                        event_handler
-                            .on_event(crate::core::window::WindowEvent::EventsCleared, self);
-                    }
-                    _ => {}
-                }
-            })
-            .unwrap();
+    fn get_raw_display_handle(&self) -> Option<raw_window_handle::RawDisplayHandle> {
+        Some(self.window.as_ref()?.raw_display_handle())
     }
 
     fn set_cursor_visible(&mut self, val: bool) {
-        self.window.set_cursor_visible(val);
+        if let Some(window) = self.window.as_mut() {
+            window.set_cursor_visible(val);
+        }
     }
 
     fn set_title(&mut self, title: &'static str) {
-        self.window.set_title(title);
+        if let Some(window) = self.window.as_mut() {
+            window.set_title(title);
+        }
     }
 
     fn set_transparency_enabled(&mut self, value: bool) {
-        self.window.set_transparent(value);
+        if let Some(window) = self.window.as_mut() {
+            window.set_transparent(value);
+        }
     }
 
     fn set_visible(&mut self, value: bool) {
-        self.window.set_visible(value);
+        if let Some(window) = self.window.as_mut() {
+            window.set_visible(value);
+        }
     }
 
     fn set_resizable(&mut self, value: bool) {
-        self.window.set_resizable(value);
+        if let Some(window) = self.window.as_mut() {
+            window.set_resizable(value);
+        }
     }
 
     fn set_minimized(&mut self, value: bool) {
-        self.window.set_minimized(value);
+        if let Some(window) = self.window.as_mut() {
+            window.set_minimized(value);
+        }
     }
 
     fn set_fullscreen(&mut self) {
-        self.window
-            .set_fullscreen(Some(winit::window::Fullscreen::Borderless(None)));
+        if let Some(window) = self.window.as_mut() {
+            window.set_fullscreen(Some(winit::window::Fullscreen::Borderless(None)));
+        }
     }
 
     fn set_borderless(&mut self) {
-        self.window
-            .set_fullscreen(Some(winit::window::Fullscreen::Borderless(None)));
+        if let Some(window) = self.window.as_mut() {
+            window.set_fullscreen(Some(winit::window::Fullscreen::Borderless(None)));
+        }
     }
 
     fn set_windowed(&mut self) {
-        self.window.set_fullscreen(None);
+        if let Some(window) = self.window.as_mut() {
+            window.set_fullscreen(None);
+        }
     }
 
     fn set_decorations(&mut self, value: bool) {
-        self.window.set_decorations(value);
+        if let Some(window) = self.window.as_mut() {
+            window.set_decorations(value);
+        }
     }
 
     fn focus_window(&mut self) {
-        self.window.focus_window();
+        if let Some(window) = self.window.as_mut() {
+            window.focus_window();
+        }
     }
 
     fn request_user_attention(&mut self) {
-        self.window
-            .request_user_attention(Some(UserAttentionType::Critical));
+        if let Some(window) = self.window.as_mut() {
+            window.request_user_attention(Some(UserAttentionType::Critical));
+        }
     }
 }
 
@@ -419,5 +434,43 @@ fn winit_key_to_window_key(key: winit::keyboard::KeyCode) -> crate::core::window
         winit::keyboard::KeyCode::F23 => crate::core::window::Key::F23,
         winit::keyboard::KeyCode::F24 => crate::core::window::Key::F24,
         _ => crate::core::window::Key::Unknown,
+    }
+}
+
+impl ApplicationHandler for WinitWindow {
+    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        if self.window.is_none() {
+            self.create_window(event_loop);
+        }
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        window_id: winit::window::WindowId,
+        event: WindowEvent,
+    ) {
+        println!("got event {:?}", event);
+        if self.window.is_none() {
+            return;
+        }
+
+        let window = self.window.as_ref().unwrap();
+
+        if window.id() != window_id {
+            return;
+        }
+
+        self.handle_event(event_loop, event);
+    }
+
+    fn about_to_wait(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        if let Some(window) = self.window.as_mut() {
+            window.request_redraw();
+        }
+
+        if self.should_close {
+            event_loop.exit();
+        }
     }
 }

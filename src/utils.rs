@@ -17,8 +17,10 @@ pub enum FilePath<'a> {
 fn format_url(file_name: &str) -> reqwest::Url {
     let window = web_sys::window().unwrap();
     let location = window.location();
-    let origin = location.origin().unwrap();
-    let base = reqwest::Url::parse(&format!("{}/res/", origin,)).unwrap();
+    let href = location.href().unwrap();
+    let href = href.split('/').collect::<Vec<_>>();
+    let href = href[..href.len() - 1].join("/");
+    let base = reqwest::Url::parse(&format!("{}/res/", href)).unwrap();
     base.join(file_name).unwrap()
 }
 

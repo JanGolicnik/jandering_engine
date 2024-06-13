@@ -14,6 +14,12 @@ var tex: texture_2d<f32>;
 @group(1) @binding(1)
 var tex_sampler: sampler;
 
+struct VertexInput{
+    @location(0) position: vec3<f32>,
+    @location(1) normal: vec3<f32>,
+    @location(2) uv: vec2<f32>,
+};
+
 struct InstanceInput{
     @location(5) model_matrix_0: vec4<f32>,
     @location(6) model_matrix_1: vec4<f32>,
@@ -25,12 +31,6 @@ struct InstanceInput{
     @location(11) inv_model_matrix_2: vec4<f32>,
     @location(12) inv_model_matrix_3: vec4<f32>,
 }
-
-struct VertexInput{
-    @location(0) position: vec3<f32>,
-    @location(1) normal: vec3<f32>,
-    @location(2) uv: vec2<f32>,
-};
 
 struct VertexOutput{
     @builtin(position) clip_position: vec4<f32>,

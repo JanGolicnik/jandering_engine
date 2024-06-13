@@ -9,6 +9,7 @@ pub struct Texture {
     pub height: u32,
 }
 
+#[derive(Clone)]
 pub enum TextureFormat {
     Rgba8U,
     Bgra8U,
@@ -27,6 +28,7 @@ pub mod texture_usage {
     pub const TARGET: TextureUsage = 1 << 3;
 }
 
+#[derive(Clone)]
 pub struct TextureDescriptor<'data> {
     pub size: UVec2,
     pub sample_count: u32,

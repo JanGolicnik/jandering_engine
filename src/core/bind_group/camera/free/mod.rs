@@ -1,10 +1,11 @@
 use crate::{
     core::{
         bind_group::{BindGroup, BindGroupLayout, BindGroupLayoutEntry},
+        engine::Events,
         renderer::{BufferHandle, Renderer},
         window::{InputState, Key, WindowEvent},
     },
-    types::{Mat4, Vec2, Vec3, DEG_TO_RAD},
+    types::{Mat4, Vec2, Vec3},
 };
 
 use self::constants::*;
@@ -48,7 +49,7 @@ pub trait CameraController {
 pub struct MatrixCameraBindGroup {
     data: CameraData,
     proj: Mat4,
-    controller: Option<Box<dyn CameraController>>,
+    pub controller: Option<Box<dyn CameraController>>,
 }
 
 impl BindGroup for MatrixCameraBindGroup {
@@ -94,7 +95,7 @@ impl MatrixCameraBindGroup {
     }
 
     pub fn make_perspective(&mut self, fov: f32, aspect: f32, znear: f32, zfar: f32) {
-        self.proj = Mat4::perspective_rh(fov * DEG_TO_RAD, aspect, znear, zfar);
+        self.proj = Mat4::perspective_rh(fov.to_radians(), aspect, znear, zfar);
     }
 
     pub fn make_ortho(
@@ -123,7 +124,7 @@ impl MatrixCameraBindGroup {
         };
     }
 
-    pub fn update(&mut self, events: &[WindowEvent], dt: f32) {
+    pub fn update(&mut self, events: &Events, dt: f32) {
         if let Some(controller) = &mut self.controller {
             let controller = controller.as_mut();
 
@@ -148,12 +149,21 @@ impl MatrixCameraBindGroup {
         self
     }
 
-    pub fn position(&mut self) -> &mut Vec3 {
+    pub fn position_mut(&mut self) -> &mut Vec3 {
         &mut self.data.position
     }
+    pub fn position(&self) -> Vec3 {
+        self.data.position
+    }
 
-    pub fn direction(&mut self) -> &mut Vec3 {
+    pub fn direction_mut(&mut self) -> &mut Vec3 {
         &mut self.data.direction
+    }
+    pub fn direction(&self) -> Vec3 {
+        self.data.direction
+    }
+    pub fn controller(&self) -> &Option<Box<dyn CameraController>> {
+        &self.controller
     }
 }
 
@@ -234,8 +244,8 @@ impl CameraController for FreeCameraController {
         } = *self;
 
         let mut direction = Vec3::new(0.0, 0.0, 0.0);
-        let yaw_rad = yaw * DEG_TO_RAD;
-        let pitch_rad = pitch * DEG_TO_RAD;
+        let yaw_rad = yaw.to_radians();
+        let pitch_rad = pitch.to_radians();
         direction.x = yaw_rad.cos() * pitch_rad.cos();
         direction.y = pitch_rad.sin();
         direction.z = yaw_rad.sin() * pitch_rad.cos();
