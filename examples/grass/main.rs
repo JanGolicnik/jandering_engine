@@ -1,7 +1,7 @@
 // use grass_object::GrassObject;
 // use image::GenericImageView;
 // use jandering_engine::{
-//     core::{
+//     {
 //         bind_group::{
 //             camera::free::MatrixCameraBindGroup, texture::TextureBindGroup, BindGroup,
 //             BindGroupLayout, BindGroupLayoutEntry,
@@ -147,7 +147,7 @@
 
 //         let tex_sampler = engine.renderer.create_sampler(SamplerDescriptor {
 //             address_mode:
-//                 jandering_engine::core::texture::sampler::SamplerAddressMode::RepeatMirrored,
+//                 jandering_engine::texture::sampler::SamplerAddressMode::RepeatMirrored,
 //             ..Default::default()
 //         });
 
@@ -208,7 +208,7 @@
 //         }
 //     }
 
-//     fn setup_grass_lod1(&mut self, renderer: &mut Box<dyn Renderer>) {
+//     fn setup_grass_lod1(&mut self, renderer: &mut Box<Renderer>) {
 //         let render_data = get_typed_bind_group_mut(renderer.as_mut(), self.render_data).unwrap();
 //         render_data.data.sqrt_n_grass = (GRASS_LOD1_N as f32).sqrt() as u32;
 //         render_data.data.render_square_size = GRASS_LOD1_SIDE;
@@ -216,7 +216,7 @@
 //         renderer.write_bind_group(self.render_data.into(), &render_data.get_data());
 //     }
 
-//     fn setup_grass_lod2(&mut self, renderer: &mut Box<dyn Renderer>) {
+//     fn setup_grass_lod2(&mut self, renderer: &mut Box<Renderer>) {
 //         let render_data = get_typed_bind_group_mut(renderer.as_mut(), self.render_data).unwrap();
 //         render_data.data.sqrt_n_grass = (GRASS_LOD2_N as f32).sqrt() as u32;
 //         render_data.data.render_square_size = GRASS_LOD2_SIDE;
@@ -314,7 +314,7 @@
 //         }
 //     }
 
-//     fn on_render(&mut self, renderer: &mut Box<dyn Renderer>) {
+//     fn on_render(&mut self, renderer: &mut Box<Renderer>) {
 //         let camera = get_typed_bind_group(renderer.as_ref(), self.camera).unwrap();
 //         renderer.write_bind_group(self.camera.into(), &camera.get_data());
 
@@ -392,7 +392,7 @@
 //         bytemuck::cast_slice(&[self.data]).into()
 //     }
 
-//     fn get_layout(&self, _renderer: &mut dyn Renderer) -> BindGroupLayout {
+//     fn get_layout(&self, _renderer: &mut Renderer) -> BindGroupLayout {
 //         BindGroupLayout {
 //             entries: vec![BindGroupLayoutEntry::Data(self.buffer_handle)],
 //         }
@@ -400,7 +400,7 @@
 // }
 
 // impl RenderDataBindGroup {
-//     fn new(renderer: &mut dyn Renderer) -> Self {
+//     fn new(renderer: &mut Renderer) -> Self {
 //         let data = RenderDataData {
 //             time: 0.0,
 //             ground_color: Vec3::new(0.1, 0.4, 0.2),

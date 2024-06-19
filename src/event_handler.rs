@@ -6,5 +6,5 @@ use super::{engine::EngineContext, renderer::Renderer};
 pub trait EventHandler {
     fn on_update(&mut self, engine: &mut EngineContext<'_>);
 
-    fn on_render(&mut self, renderer: &mut Box<dyn Renderer>);
+    fn on_render(&mut self, renderer: &mut Renderer);
 }

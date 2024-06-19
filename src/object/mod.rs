@@ -1,4 +1,4 @@
-use crate::{core::shader::BufferLayoutEntryDataType, types::*, utils::load_obj};
+use crate::{renderer::Janderer, shader::BufferLayoutEntryDataType, types::*, utils::load_obj};
 
 use self::primitives::{quad_data, triangle_data};
 
@@ -41,7 +41,7 @@ pub struct Object<T> {
 impl Vertex {
     pub fn desc() -> BufferLayout {
         BufferLayout {
-            step_mode: crate::core::shader::BufferLayoutStepMode::Vertex,
+            step_mode: crate::shader::BufferLayoutStepMode::Vertex,
             entries: &[
                 BufferLayoutEntry {
                     location: 0,
@@ -79,7 +79,7 @@ impl Default for Instance {
 impl Instance {
     pub fn desc() -> BufferLayout {
         BufferLayout {
-            step_mode: crate::core::shader::BufferLayoutStepMode::Instance,
+            step_mode: crate::shader::BufferLayoutStepMode::Instance,
             entries: &[
                 BufferLayoutEntry {
                     location: 5,
@@ -172,7 +172,7 @@ impl Instance {
 
 impl<T: bytemuck::Pod> Object<T> {
     pub fn new(
-        renderer: &mut dyn Renderer,
+        renderer: &mut Renderer,
         vertices: Vec<Vertex>,
         indices: Vec<u32>,
         instances: Vec<T>,
@@ -202,7 +202,7 @@ impl<T: bytemuck::Pod> Object<T> {
         }
     }
 
-    pub fn update(&mut self, renderer: &mut dyn Renderer) {
+    pub fn update(&mut self, renderer: &mut Renderer) {
         if self.previous_instances_len != self.instances.len() {
             self.render_data.instance_buffer =
                 renderer.create_vertex_buffer(bytemuck::cast_slice(&self.instances));
@@ -215,12 +215,12 @@ impl<T: bytemuck::Pod> Object<T> {
         }
     }
 
-    pub fn from_obj(data: &str, renderer: &mut dyn Renderer, instances: Vec<T>) -> Object<T> {
+    pub fn from_obj(data: &str, renderer: &mut Renderer, instances: Vec<T>) -> Object<T> {
         let (vertices, indices) = load_obj(data);
         Self::new(renderer, vertices, indices, instances)
     }
 
-    pub fn triangle(renderer: &mut dyn Renderer, instances: Vec<T>) -> Self
+    pub fn triangle(renderer: &mut Renderer, instances: Vec<T>) -> Self
     where
         T: bytemuck::Pod,
     {
@@ -228,7 +228,7 @@ impl<T: bytemuck::Pod> Object<T> {
         Self::new(renderer, vertices, indices, instances)
     }
 
-    pub fn quad(renderer: &mut dyn Renderer, instances: Vec<T>) -> Self
+    pub fn quad(renderer: &mut Renderer, instances: Vec<T>) -> Self
     where
         T: bytemuck::Pod,
     {

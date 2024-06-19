@@ -1,10 +1,8 @@
 use crate::{
-    core::{
-        bind_group::{BindGroup, BindGroupLayout, BindGroupLayoutEntry},
-        renderer::{BufferHandle, Renderer},
-        window::{InputState, Key, MouseButton, Window, WindowEvent},
-    },
+    bind_group::{BindGroup, BindGroupLayout, BindGroupLayoutEntry},
+    renderer::{BufferHandle, Janderer, Renderer},
     types::{UVec2, Vec2},
+    window::{InputState, Key, MouseButton, Window, WindowEvent},
 };
 
 #[repr(C)]
@@ -45,7 +43,7 @@ impl BindGroup for D2CameraBindGroup {
         bytemuck::cast_slice(&[self.data]).into()
     }
 
-    fn get_layout(&self, renderer: &mut dyn Renderer) -> BindGroupLayout {
+    fn get_layout(&self, renderer: &mut Renderer) -> BindGroupLayout {
         let buffer_handle = renderer.create_uniform_buffer(&self.get_data());
         BindGroupLayout {
             entries: vec![BindGroupLayoutEntry::Data(buffer_handle)],
@@ -131,7 +129,7 @@ impl D2CameraBindGroup {
         }
     }
 
-    pub fn update(&mut self, events: &[WindowEvent], _: &dyn Window, resolution: UVec2, dt: f32) {
+    pub fn update(&mut self, events: &[WindowEvent], _: &Window, resolution: UVec2, dt: f32) {
         self.resize(resolution);
 
         self.handle_events(events);

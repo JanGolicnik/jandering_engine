@@ -1,9 +1,9 @@
 use crate::{
-    core::{
+    types::Vec3,
+    {
         object::Renderable,
         renderer::{RenderPass, ShaderHandle, TextureHandle, UntypedBindGroupHandle},
     },
-    types::Vec3,
 };
 
 use std::collections::HashMap;
@@ -165,7 +165,7 @@ impl<'renderer> RenderPass<'renderer> for WGPURenderPass<'renderer> {
     fn bind(
         mut self: Box<Self>,
         slot: u32,
-        handle: crate::core::renderer::UntypedBindGroupHandle,
+        handle: crate::renderer::UntypedBindGroupHandle,
     ) -> Box<dyn RenderPass<'renderer> + 'renderer> {
         self.bind_groups
             .entry(slot)
@@ -182,7 +182,7 @@ impl<'renderer> RenderPass<'renderer> for WGPURenderPass<'renderer> {
 
     fn set_shader(
         mut self: Box<Self>,
-        shader: crate::core::renderer::ShaderHandle,
+        shader: crate::renderer::ShaderHandle,
     ) -> Box<dyn RenderPass<'renderer> + 'renderer> {
         self.shader = shader;
         self

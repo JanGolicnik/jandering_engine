@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use crate::{
-    core::object::Vertex,
+    object::Vertex,
     types::{UVec2, Vec2, Vec3},
 };
 

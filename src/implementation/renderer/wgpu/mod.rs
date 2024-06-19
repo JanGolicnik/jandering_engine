@@ -1,35 +1,34 @@
+use std::marker::PhantomData;
+
+use render_pass::WGPURenderPass;
 use wgpu::util::DeviceExt;
 
 use crate::{
-    core::{
-        bind_group::{BindGroup, BindGroupLayoutEntry},
-        renderer::{
-            BufferHandle, RenderPass, Renderer, SamplerHandle, ShaderHandle, TextureHandle,
-            UntypedBindGroupHandle,
+    bind_group::{BindGroup, BindGroupLayoutEntry},
+    renderer::{
+        BindGroupHandle, BufferHandle, Janderer, RenderPass, SamplerHandle, ShaderHandle,
+        TextureHandle, UntypedBindGroupHandle,
+    },
+    shader::ShaderDescriptor,
+    texture::{
+        sampler::{
+            SamplerAddressMode, SamplerCompareFunction, SamplerDescriptor, SamplerFilterMode,
         },
-        shader::ShaderDescriptor,
-        texture::{
-            sampler::{
-                SamplerAddressMode, SamplerCompareFunction, SamplerDescriptor, SamplerFilterMode,
-            },
-            texture_usage, Texture, TextureDescriptor, TextureFormat,
-        },
-        window::Window,
+        texture_usage, Texture, TextureDescriptor, TextureFormat,
     },
     types::UVec2,
+    window::{Window, WindowTrait},
 };
-
-use self::render_pass::WGPURenderPass;
 
 mod bind_groups;
 pub mod render_pass;
 
-struct BindGroupRenderData {
+struct WGPUBindGroupRenderData {
     pub bind_group: wgpu::BindGroup,
     pub buffer_handle: BufferHandle,
 }
 
-pub struct Shader {
+pub struct WGPUShader {
     pub pipeline: wgpu::RenderPipeline,
 }
 
@@ -38,10 +37,10 @@ pub struct WGPURenderer {
     pub(crate) device: wgpu::Device,
     config: wgpu::SurfaceConfiguration,
     pub queue: wgpu::Queue,
-    pub(crate) shaders: Vec<Shader>,
+    pub(crate) shaders: Vec<WGPUShader>,
     shader_descriptors: Vec<ShaderDescriptor>,
     bind_groups: Vec<Box<dyn BindGroup>>,
-    bind_groups_render_data: Vec<BindGroupRenderData>,
+    bind_groups_render_data: Vec<WGPUBindGroupRenderData>,
     pub(crate) textures: Vec<Texture>,
     pub(crate) samplers: Vec<wgpu::Sampler>,
     pub(crate) buffers: Vec<wgpu::Buffer>,
@@ -49,12 +48,94 @@ pub struct WGPURenderer {
     limits: wgpu::Limits,
 }
 
-impl Renderer for WGPURenderer {
+impl Drop for WGPURenderer {
+    fn drop(&mut self) {
+        log::info!("HEYY")
+    }
+}
+
+impl Janderer for WGPURenderer {
+    async fn new(window: &Window) -> Self {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::all(),
+            ..Default::default()
+        });
+
+        let surface = unsafe { instance.create_surface(&window) }.unwrap();
+
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::default(),
+                compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
+            })
+            .await
+            .unwrap();
+
+        let limits = if cfg!(target_arch = "wasm32") {
+            wgpu::Limits::downlevel_webgl2_defaults()
+        } else {
+            wgpu::Limits::default()
+        };
+
+        let (width, height) = {
+            let size = window.size();
+            (size.0, size.1)
+        };
+
+        let (device, queue) = adapter
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    features: wgpu::Features::empty(),
+                    limits: limits.clone(),
+                    label: None,
+                },
+                None,
+            )
+            .await
+            .unwrap();
+
+        let surface_capabilities = surface.get_capabilities(&adapter);
+
+        let surface_format = surface_capabilities
+            .formats
+            .iter()
+            .copied()
+            .find(|f| f.is_srgb())
+            .unwrap_or(surface_capabilities.formats[0]);
+
+        let config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: surface_format,
+            width,
+            height,
+            present_mode: surface_capabilities.present_modes[0],
+            alpha_mode: surface_capabilities.alpha_modes[0],
+            view_formats: vec![],
+        };
+
+        surface.configure(&device, &config);
+
+        Self {
+            surface,
+            device,
+            config,
+            queue,
+            textures: Vec::new(),
+            samplers: Vec::new(),
+            shaders: Vec::new(),
+            shader_descriptors: Vec::new(),
+            bind_groups: Vec::new(),
+            bind_groups_render_data: Vec::new(),
+            buffers: Vec::new(),
+            surface_data: None,
+            limits,
+        }
+    }
     fn resize(&mut self, width: u32, height: u32) {
         if width > 0 && height > 0 {
             self.config.width = width;
             self.config.height = height;
-            dbg!("configured");
             self.surface.configure(&self.device, &self.config);
         }
     }
@@ -127,7 +208,6 @@ impl Renderer for WGPURenderer {
             .create_view(&wgpu::TextureViewDescriptor::default());
 
         self.surface_data = Some((surface, surface_view));
-
         true
     }
 
@@ -153,7 +233,7 @@ impl Renderer for WGPURenderer {
                 push_constant_ranges: &[],
             });
 
-        let crate::core::shader::ShaderSource::Code(code) = &desc.source;
+        let crate::shader::ShaderSource::Code(code) = &desc.source;
 
         let shader = wgpu::ShaderModuleDescriptor {
             label: Some("Shader"),
@@ -225,7 +305,7 @@ impl Renderer for WGPURenderer {
                 multiview: None,
             });
 
-        let shader = Shader { pipeline };
+        let shader = WGPUShader { pipeline };
 
         if handle.0 >= self.shaders.len() {
             self.shaders.push(shader);
@@ -438,7 +518,7 @@ impl Renderer for WGPURenderer {
                 label: Some("bind_group"),
             });
 
-            let data = BindGroupRenderData {
+            let data = WGPUBindGroupRenderData {
                 bind_group,
                 buffer_handle: first_handle,
             };
@@ -463,88 +543,43 @@ impl Renderer for WGPURenderer {
         handle
     }
 
+    fn create_typed_bind_group_at<T: BindGroup>(
+        &mut self,
+        bind_group: T,
+        handle: BindGroupHandle<T>,
+    ) {
+        self.create_bind_group_at(Box::new(bind_group), handle.into());
+    }
+
+    fn create_typed_bind_group<T: BindGroup>(&mut self, bind_group: T) -> BindGroupHandle<T> {
+        let handle = self.create_bind_group(Box::new(bind_group));
+        BindGroupHandle(handle.0, PhantomData::<T>)
+    }
+
+    fn get_typed_bind_group<T: BindGroup>(&self, handle: BindGroupHandle<T>) -> Option<&T> {
+        if let Some(b) = self.get_bind_group(handle.into()) {
+            let any = b.as_any();
+            if let Some(bind_group) = any.downcast_ref::<T>() {
+                return Some(bind_group);
+            }
+        }
+        None
+    }
+
+    fn get_typed_bind_group_mut<T: BindGroup>(
+        &mut self,
+        handle: BindGroupHandle<T>,
+    ) -> Option<&mut T> {
+        if let Some(b) = self.get_bind_group_mut(handle.into()) {
+            let any = b.as_any_mut();
+            if let Some(bind_group) = any.downcast_mut::<T>() {
+                return Some(bind_group);
+            }
+        }
+        None
+    }
+
     fn max_texture_size(&self) -> UVec2 {
         UVec2::splat(self.limits.max_texture_dimension_2d)
-    }
-}
-
-impl WGPURenderer {
-    #[allow(clippy::borrowed_box)]
-    pub async fn new(window: &Box<dyn Window>) -> Self {
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
-            ..Default::default()
-        });
-
-        let surface = unsafe { instance.create_surface(&window.as_ref()) }.unwrap();
-
-        let adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::default(),
-                compatible_surface: Some(&surface),
-                force_fallback_adapter: false,
-            })
-            .await
-            .unwrap();
-
-        let limits = if cfg!(target_arch = "wasm32") {
-            wgpu::Limits::downlevel_webgl2_defaults()
-        } else {
-            wgpu::Limits::default()
-        };
-
-        let (width, height) = {
-            let size = window.size();
-            (size.0, size.1)
-        };
-
-        let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    features: wgpu::Features::empty(),
-                    limits: limits.clone(),
-                    label: None,
-                },
-                None,
-            )
-            .await
-            .unwrap();
-
-        let surface_capabilities = surface.get_capabilities(&adapter);
-
-        let surface_format = surface_capabilities
-            .formats
-            .iter()
-            .copied()
-            .find(|f| f.is_srgb())
-            .unwrap_or(surface_capabilities.formats[0]);
-
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface_format,
-            width,
-            height,
-            present_mode: surface_capabilities.present_modes[0],
-            alpha_mode: surface_capabilities.alpha_modes[0],
-            view_formats: vec![],
-        };
-
-        surface.configure(&device, &config);
-
-        Self {
-            surface,
-            device,
-            config,
-            queue,
-            textures: Vec::new(),
-            samplers: Vec::new(),
-            shaders: Vec::new(),
-            shader_descriptors: Vec::new(),
-            bind_groups: Vec::new(),
-            bind_groups_render_data: Vec::new(),
-            buffers: Vec::new(),
-            surface_data: None,
-            limits,
-        }
     }
 }

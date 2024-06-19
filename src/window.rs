@@ -1,5 +1,11 @@
-pub trait Window {
+use crate::implementation::window::winit::WinitWindow;
+
+pub type Window = WinitWindow;
+
+pub trait WindowTrait {
     fn resize(&mut self, width: u32, height: u32);
+
+    fn set_position(&mut self, x: i32, y: i32);
 
     fn set_cursor_position(&self, x: u32, y: u32);
 
@@ -31,6 +37,8 @@ pub trait Window {
 
     fn set_windowed(&mut self);
 
+    fn set_as_desktop(&mut self);
+
     fn set_decorations(&mut self, value: bool);
 
     fn focus_window(&mut self);
@@ -42,13 +50,13 @@ pub trait Window {
     fn get_raw_display_handle(&self) -> Option<raw_window_handle::RawDisplayHandle>;
 }
 
-unsafe impl raw_window_handle::HasRawWindowHandle for dyn Window {
+unsafe impl raw_window_handle::HasRawWindowHandle for Window {
     fn raw_window_handle(&self) -> raw_window_handle::RawWindowHandle {
         self.get_raw_window_handle().unwrap()
     }
 }
 
-unsafe impl raw_window_handle::HasRawDisplayHandle for dyn Window {
+unsafe impl raw_window_handle::HasRawDisplayHandle for Window {
     fn raw_display_handle(&self) -> raw_window_handle::RawDisplayHandle {
         self.get_raw_display_handle().unwrap()
     }
@@ -176,6 +184,7 @@ pub enum MouseButton {
 #[derive(Copy, Debug, Clone, PartialEq)]
 pub enum WindowEvent {
     Resized((u32, u32)),
+    ScaleFactorChanged(f32),
 
     MouseMotion((f32, f32)),
 
@@ -240,9 +249,25 @@ impl WindowConfig {
         self
     }
 }
+#[cfg(target_arch = "wasm32")]
+use crate::engine::EngineEvent;
+#[cfg(target_arch = "wasm32")]
+use std::sync::Arc;
+#[cfg(target_arch = "wasm32")]
+use winit::event_loop::EventLoopProxy;
 
-pub trait WindowEventHandler {
-    fn on_event(&mut self, event: WindowEvent, window: &mut dyn Window);
+pub trait WindowEventHandler<T> {
+    fn on_event(&mut self, event: WindowEvent, window: &mut Window);
 
-    fn window_created(&mut self, window: &mut dyn Window);
+    fn on_custom_event(&mut self, event: T, window: &mut Window);
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn window_created(&mut self, window: &mut Window);
+
+    #[cfg(target_arch = "wasm32")]
+    fn window_created(
+        &mut self,
+        window: Arc<std::sync::Mutex<Window>>,
+        event_loop_proxy: EventLoopProxy<EngineEvent>,
+    );
 }

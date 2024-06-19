@@ -1,6 +1,6 @@
-use std::{marker::PhantomData, ops::Range};
+use std::ops::Range;
 
-use crate::types::UVec2;
+use crate::{implementation::renderer::wgpu::WGPURenderer, types::UVec2, window::Window};
 
 use super::{
     bind_group::BindGroup,
@@ -26,7 +26,20 @@ pub struct UntypedBindGroupHandle(pub usize);
 #[derive(Copy, Clone, Debug)]
 pub struct ShaderHandle(pub usize);
 
-pub trait Renderer {
+cfg_if::cfg_if! {
+    if #[cfg(feature = "wgpu")] {
+        pub type Renderer = WGPURenderer;
+    }
+    // else if #[cfg(feature="nekinovga")] {
+    //     pub type Renderer = NekiNovga;
+    // }
+}
+
+pub trait Janderer {
+    #[allow(async_fn_in_trait)]
+    #[allow(opaque_hidden_inferred_bound)]
+    async fn new(window: &Window) -> Self;
+
     fn resize(&mut self, width: u32, height: u32);
 
     fn set_width(&mut self, width: u32);
@@ -80,6 +93,21 @@ pub trait Renderer {
     fn get_bind_group(&self, handle: UntypedBindGroupHandle) -> Option<&dyn BindGroup>;
 
     fn get_bind_group_mut(&mut self, handle: UntypedBindGroupHandle) -> Option<&mut dyn BindGroup>;
+
+    fn create_typed_bind_group_at<T: BindGroup>(
+        &mut self,
+        bind_group: T,
+        handle: BindGroupHandle<T>,
+    );
+
+    fn create_typed_bind_group<T: BindGroup>(&mut self, bind_group: T) -> BindGroupHandle<T>;
+
+    fn get_typed_bind_group<T: BindGroup>(&self, handle: BindGroupHandle<T>) -> Option<&T>;
+
+    fn get_typed_bind_group_mut<T: BindGroup>(
+        &mut self,
+        handle: BindGroupHandle<T>,
+    ) -> Option<&mut T>;
 
     fn write_bind_group(&mut self, handle: UntypedBindGroupHandle, data: &[u8]);
 
@@ -138,46 +166,4 @@ pub trait RenderPass<'renderer> {
         target: TextureHandle,
         resolve: Option<TextureHandle>,
     ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
-}
-
-pub fn create_typed_bind_group_at<T: BindGroup>(
-    renderer: &mut dyn Renderer,
-    bind_group: T,
-    handle: BindGroupHandle<T>,
-) {
-    renderer.create_bind_group_at(Box::new(bind_group), handle.into());
-}
-
-pub fn create_typed_bind_group<T: BindGroup>(
-    renderer: &mut dyn Renderer,
-    bind_group: T,
-) -> BindGroupHandle<T> {
-    let handle = renderer.create_bind_group(Box::new(bind_group));
-    BindGroupHandle(handle.0, PhantomData::<T>)
-}
-
-pub fn get_typed_bind_group<T: BindGroup>(
-    renderer: &dyn Renderer,
-    handle: BindGroupHandle<T>,
-) -> Option<&T> {
-    if let Some(b) = renderer.get_bind_group(handle.into()) {
-        let any = b.as_any();
-        if let Some(bind_group) = any.downcast_ref::<T>() {
-            return Some(bind_group);
-        }
-    }
-    None
-}
-
-pub fn get_typed_bind_group_mut<T: BindGroup>(
-    renderer: &mut dyn Renderer,
-    handle: BindGroupHandle<T>,
-) -> Option<&mut T> {
-    if let Some(b) = renderer.get_bind_group_mut(handle.into()) {
-        let any = b.as_any_mut();
-        if let Some(bind_group) = any.downcast_mut::<T>() {
-            return Some(bind_group);
-        }
-    }
-    None
 }

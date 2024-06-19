@@ -1,6 +1,6 @@
 use wgpu::VertexAttribute;
 
-use crate::core::{
+use crate::{
     bind_group::{BindGroupLayout, BindGroupLayoutEntry},
     renderer::{BindGroupHandle, UntypedBindGroupHandle},
     shader::BufferLayout,
@@ -65,21 +65,19 @@ impl WGPURenderer {
         for entry in layout.entries.iter() {
             entries.push(wgpu::VertexAttribute {
                 format: match entry.data_type {
-                    crate::core::shader::BufferLayoutEntryDataType::Float32 => {
+                    crate::shader::BufferLayoutEntryDataType::Float32 => {
                         wgpu::VertexFormat::Float32
                     }
-                    crate::core::shader::BufferLayoutEntryDataType::Float32x2 => {
+                    crate::shader::BufferLayoutEntryDataType::Float32x2 => {
                         wgpu::VertexFormat::Float32x2
                     }
-                    crate::core::shader::BufferLayoutEntryDataType::Float32x3 => {
+                    crate::shader::BufferLayoutEntryDataType::Float32x3 => {
                         wgpu::VertexFormat::Float32x3
                     }
-                    crate::core::shader::BufferLayoutEntryDataType::Float32x4 => {
+                    crate::shader::BufferLayoutEntryDataType::Float32x4 => {
                         wgpu::VertexFormat::Float32x4
                     }
-                    crate::core::shader::BufferLayoutEntryDataType::U32 => {
-                        wgpu::VertexFormat::Uint32
-                    }
+                    crate::shader::BufferLayoutEntryDataType::U32 => wgpu::VertexFormat::Uint32,
                 },
                 offset,
                 shader_location: entry.location,
@@ -110,10 +108,10 @@ impl WGPURenderer {
                     wgpu::VertexBufferLayout {
                         array_stride: offset as wgpu::BufferAddress,
                         step_mode: match e.step_mode {
-                            crate::core::shader::BufferLayoutStepMode::Vertex => {
+                            crate::shader::BufferLayoutStepMode::Vertex => {
                                 wgpu::VertexStepMode::Vertex
                             }
-                            crate::core::shader::BufferLayoutStepMode::Instance => {
+                            crate::shader::BufferLayoutStepMode::Instance => {
                                 wgpu::VertexStepMode::Instance
                             }
                         },
