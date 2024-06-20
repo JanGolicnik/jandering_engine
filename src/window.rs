@@ -41,6 +41,10 @@ pub trait WindowTrait {
 
     fn set_decorations(&mut self, value: bool);
 
+    fn set_fps_prefrence(&mut self, preference: FpsPreference);
+
+    fn get_fps_prefrence(&self) -> FpsPreference;
+
     fn focus_window(&mut self);
 
     fn request_user_attention(&mut self);
@@ -201,7 +205,6 @@ pub enum WindowEvent {
     },
     RedrawRequested,
     CloseRequested,
-    EventsCleared,
 
     MouseEntered,
     MouseLeft,
@@ -212,10 +215,18 @@ pub enum WindowResolution {
     Auto,
 }
 
+#[derive(Clone, Copy)]
+pub enum FpsPreference {
+    Vsync,
+    Exact(u32),
+    Uncapped,
+}
+
 pub struct WindowConfig {
     pub title: &'static str,
     pub resolution: WindowResolution,
     pub show_cursor: bool,
+    pub fps_preference: FpsPreference,
 }
 
 impl Default for WindowConfig {
@@ -224,6 +235,7 @@ impl Default for WindowConfig {
             resolution: WindowResolution::Auto,
             show_cursor: true,
             title: "Cool app",
+            fps_preference: FpsPreference::Vsync,
         }
     }
 }
@@ -248,7 +260,12 @@ impl WindowConfig {
         self.title = title;
         self
     }
+    pub fn with_fps_preference(mut self, fps_preference: FpsPreference) -> Self {
+        self.fps_preference = fps_preference;
+        self
+    }
 }
+
 #[cfg(target_arch = "wasm32")]
 use crate::engine::EngineEvent;
 #[cfg(target_arch = "wasm32")]

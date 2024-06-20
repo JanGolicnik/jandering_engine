@@ -10,7 +10,7 @@ use winit::{
 
 use crate::{
     engine::EngineEvent,
-    window::{WindowConfig, WindowEventHandler, WindowTrait},
+    window::{FpsPreference, WindowConfig, WindowEventHandler, WindowTrait},
 };
 
 #[cfg(target_arch = "wasm32")]
@@ -129,14 +129,6 @@ impl WinitWindow {
         }
     }
 }
-
-// winit::event::Event::NewEvents(cause) => {
-//     self.is_init = cause == StartCause::Init;
-// }
-// winit::event::Event::AboutToWait => {
-//     event_handler.on_event(crate::window::WindowEvent::EventsCleared, self);
-// }
-// _ => {}
 
 impl WindowTrait for WinitWindow {
     fn resize(&mut self, width: u32, height: u32) {
@@ -257,6 +249,21 @@ impl WindowTrait for WinitWindow {
                 raw_window_handle::RawWindowHandle::Win32(handle) => unsafe {
                     let mut hwnd = windows::Win32::Foundation::HWND(0);
 
+                    let progman_hwnd = windows::Win32::UI::WindowsAndMessaging::FindWindowA(
+                        windows::core::s!("ProgMan"),
+                        None,
+                    );
+
+                    windows::Win32::UI::WindowsAndMessaging::SendMessageTimeoutA(
+                        progman_hwnd,
+                        0x052C,
+                        None,
+                        None,
+                        windows::Win32::UI::WindowsAndMessaging::SMTO_NORMAL,
+                        1000,
+                        None,
+                    );
+
                     windows::Win32::UI::WindowsAndMessaging::EnumWindows(
                         Some(enum_windows_proc),
                         windows::Win32::Foundation::LPARAM(
@@ -288,6 +295,14 @@ impl WindowTrait for WinitWindow {
 
     fn get_raw_display_handle(&self) -> Option<raw_window_handle::RawDisplayHandle> {
         Some(self.window.as_ref()?.raw_display_handle())
+    }
+
+    fn set_fps_prefrence(&mut self, preference: crate::window::FpsPreference) {
+        self.config.fps_preference = preference;
+    }
+
+    fn get_fps_prefrence(&self) -> crate::window::FpsPreference {
+        self.config.fps_preference
     }
 }
 
@@ -514,10 +529,6 @@ impl ApplicationHandler<EngineEvent> for WinitWindow {
     }
 
     fn about_to_wait(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        if let Some(window) = self.window.as_mut() {
-            window.request_redraw();
-        }
-
         if self.should_close {
             event_loop.exit();
         }

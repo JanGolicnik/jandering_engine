@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use render_pass::WGPURenderPass;
-use wgpu::util::DeviceExt;
+use wgpu::{util::DeviceExt, PresentMode};
 
 use crate::{
     bind_group::{BindGroup, BindGroupLayoutEntry},
@@ -104,12 +104,19 @@ impl Janderer for WGPURenderer {
             .find(|f| f.is_srgb())
             .unwrap_or(surface_capabilities.formats[0]);
 
+        let present_mode = match window.get_fps_prefrence() {
+            crate::window::FpsPreference::Vsync => PresentMode::AutoVsync,
+            crate::window::FpsPreference::Exact(_) | crate::window::FpsPreference::Uncapped => {
+                PresentMode::Immediate
+            }
+        };
+
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
             width,
             height,
-            present_mode: surface_capabilities.present_modes[0],
+            present_mode,
             alpha_mode: surface_capabilities.alpha_modes[0],
             view_formats: vec![],
         };

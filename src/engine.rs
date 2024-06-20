@@ -1,6 +1,7 @@
 use std::{
     slice::Iter,
     sync::{Arc, Mutex},
+    thread::sleep_ms,
 };
 
 use crate::{renderer::Janderer, window::WindowTrait};
@@ -16,6 +17,8 @@ pub struct Engine<E: EventHandler, T: EventHandlerBuilder<E>> {
     pub events: Events,
     renderer: Option<Renderer>,
     marker: std::marker::PhantomData<T>,
+
+    last_frame_time: std::time::Instant,
 }
 
 impl<E: EventHandler + 'static, T: EventHandlerBuilder<E> + 'static> Engine<E, T> {
@@ -25,6 +28,7 @@ impl<E: EventHandler + 'static, T: EventHandlerBuilder<E> + 'static> Engine<E, T
             events: Events::default(),
             renderer: None,
             marker: std::marker::PhantomData,
+            last_frame_time: std::time::Instant::now(),
         };
         Window::run(builder.window_builder, engine);
     }
@@ -42,6 +46,7 @@ pub struct EngineContext<'a> {
     pub window: &'a mut Window,
     pub renderer: &'a mut Renderer,
 }
+use web_time::Duration;
 #[cfg(target_arch = "wasm32")]
 use winit::event_loop::EventLoopProxy;
 
@@ -66,6 +71,19 @@ impl<E: EventHandler, T: EventHandlerBuilder<E>> WindowEventHandler<EngineEvent>
                 self.events.push(event);
             }
             WindowEvent::RedrawRequested => {
+                if let crate::window::FpsPreference::Exact(fps) = window.get_fps_prefrence() {
+                    #[cfg(target_arch = "wasm32")]
+                    panic!();
+
+                    let now = std::time::Instant::now();
+                    let dt = now - self.last_frame_time;
+                    let min_dt = Duration::from_millis(1000 / fps as u64);
+                    if dt < min_dt {
+                        std::thread::sleep(min_dt - dt);
+                    }
+                    self.last_frame_time = std::time::Instant::now();
+                }
+
                 let mut context = EngineContext {
                     events: &self.events,
                     window,
@@ -80,11 +98,10 @@ impl<E: EventHandler, T: EventHandlerBuilder<E>> WindowEventHandler<EngineEvent>
                 renderer.present();
 
                 self.events.clear();
-            }
-            WindowEvent::CloseRequested => window.close(),
-            WindowEvent::EventsCleared => {
+
                 window.request_redraw();
             }
+            WindowEvent::CloseRequested => window.close(),
             _ => self.events.push(event),
         }
     }
