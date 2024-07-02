@@ -1,6 +1,9 @@
 use std::ops::Range;
 
-use crate::{implementation::renderer::wgpu::WGPURenderer, types::UVec2, window::Window};
+use crate::{
+    implementation::renderer::wgpu::WGPURenderer,
+    window::{WindowHandle, WindowManager},
+};
 
 use super::{
     bind_group::BindGroup,
@@ -38,15 +41,11 @@ cfg_if::cfg_if! {
 pub trait Janderer {
     #[allow(async_fn_in_trait)]
     #[allow(opaque_hidden_inferred_bound)]
-    async fn new(window: &Window) -> Self;
+    async fn new() -> Self;
 
-    fn resize(&mut self, width: u32, height: u32);
+    fn register_window(&mut self, handle: WindowHandle, window_manager: &mut WindowManager);
 
-    fn set_width(&mut self, width: u32);
-
-    fn set_height(&mut self, height: u32);
-
-    fn size(&self) -> UVec2;
+    fn resize(&mut self, handle: WindowHandle, width: u32, height: u32);
 
     fn create_uniform_buffer(&mut self, contents: &[u8]) -> BufferHandle;
 
@@ -56,11 +55,10 @@ pub trait Janderer {
 
     fn write_buffer(&mut self, buffer: BufferHandle, data: &[u8]);
 
-    fn begin_frame(&mut self) -> bool;
-
-    fn present(&mut self);
-
-    fn new_pass<'renderer>(&'renderer mut self) -> Box<dyn RenderPass + 'renderer>;
+    fn new_pass<'renderer>(
+        &'renderer mut self,
+        window_handle: WindowHandle,
+    ) -> Box<dyn RenderPass + 'renderer>;
 
     fn create_shader_at(&mut self, desc: ShaderDescriptor, handle: ShaderHandle);
 
@@ -111,7 +109,7 @@ pub trait Janderer {
 
     fn write_bind_group(&mut self, handle: UntypedBindGroupHandle, data: &[u8]);
 
-    fn max_texture_size(&self) -> UVec2;
+    fn present(&mut self);
 }
 
 pub trait RenderPass<'renderer> {

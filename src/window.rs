@@ -1,6 +1,23 @@
-use crate::implementation::window::winit::WinitWindow;
+use crate::{
+    engine::EngineEvent,
+    implementation::window::winit::{WinitWindow, WinitWindowManager},
+};
 
 pub type Window = WinitWindow;
+pub type WindowManager = WinitWindowManager;
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+pub struct WindowHandle(pub(crate) u32);
+
+pub trait WindowManagerTrait {
+    fn new() -> Self;
+
+    fn run<T: WindowEventHandler<EngineEvent> + 'static>(self, event_handle: T);
+
+    fn get_window(&mut self, handle: WindowHandle) -> Option<&mut Window>;
+
+    fn create_window(&mut self, config: WindowConfig) -> WindowHandle;
+}
 
 pub trait WindowTrait {
     fn resize(&mut self, width: u32, height: u32);
@@ -49,20 +66,20 @@ pub trait WindowTrait {
 
     fn request_user_attention(&mut self);
 
-    fn get_raw_window_handle(&self) -> Option<raw_window_handle::RawWindowHandle>;
+    fn get_raw_window_handle(&self) -> raw_window_handle::RawWindowHandle;
 
-    fn get_raw_display_handle(&self) -> Option<raw_window_handle::RawDisplayHandle>;
+    fn get_raw_display_handle(&self) -> raw_window_handle::RawDisplayHandle;
 }
 
 unsafe impl raw_window_handle::HasRawWindowHandle for Window {
     fn raw_window_handle(&self) -> raw_window_handle::RawWindowHandle {
-        self.get_raw_window_handle().unwrap()
+        self.get_raw_window_handle()
     }
 }
 
 unsafe impl raw_window_handle::HasRawDisplayHandle for Window {
     fn raw_display_handle(&self) -> raw_window_handle::RawDisplayHandle {
-        self.get_raw_display_handle().unwrap()
+        self.get_raw_display_handle()
     }
 }
 
@@ -274,17 +291,18 @@ use std::sync::Arc;
 use winit::event_loop::EventLoopProxy;
 
 pub trait WindowEventHandler<T> {
-    fn on_event(&mut self, event: WindowEvent, window: &mut Window);
-
-    fn on_custom_event(&mut self, event: T, window: &mut Window);
-
-    #[cfg(not(target_arch = "wasm32"))]
-    fn window_created(&mut self, window: &mut Window);
-
-    #[cfg(target_arch = "wasm32")]
-    fn window_created(
+    fn init(
         &mut self,
-        window: Arc<std::sync::Mutex<Window>>,
-        event_loop_proxy: EventLoopProxy<EngineEvent>,
+        window_handle: crate::window::WindowHandle,
+        window_manager: &mut WindowManager,
     );
+
+    fn on_event(
+        &mut self,
+        event: WindowEvent,
+        window_handle: WindowHandle,
+        window_manager: &mut WindowManager,
+    );
+
+    fn on_custom_event(&mut self, event: T, window_manager: &mut WindowManager);
 }

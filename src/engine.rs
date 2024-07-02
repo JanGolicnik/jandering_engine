@@ -1,77 +1,83 @@
-use std::{
-    slice::Iter,
-    sync::{Arc, Mutex},
-    thread::sleep_ms,
-};
+use std::slice::Iter;
 
-use crate::{renderer::Janderer, window::WindowTrait};
+use crate::{
+    renderer::Janderer,
+    window::{WindowManager, WindowManagerTrait, WindowTrait},
+};
 
 use super::{
     event_handler::EventHandler,
     renderer::Renderer,
-    window::{Key, Window, WindowConfig, WindowEvent, WindowEventHandler},
+    window::{Key, WindowEvent, WindowEventHandler},
 };
 
-pub struct Engine<E: EventHandler, T: EventHandlerBuilder<E>> {
-    event_handler: EngineApplication<E, T>,
+pub struct Engine<T: EventHandler> {
+    event_handler: Option<T>,
     pub events: Events,
-    renderer: Option<Renderer>,
-    marker: std::marker::PhantomData<T>,
+    pub renderer: Renderer,
+
+    window_manager: Option<WindowManager>,
 
     last_frame_time: std::time::Instant,
 }
 
-impl<E: EventHandler + 'static, T: EventHandlerBuilder<E> + 'static> Engine<E, T> {
-    pub fn run(builder: EngineBuilder, event_handle_builder: T) {
-        let engine = Self {
-            event_handler: EngineApplication::Builder(event_handle_builder),
+impl<T: EventHandler + 'static> Engine<T> {
+    pub async fn new() -> Self {
+        let renderer = Renderer::new().await;
+        let window_manager = WindowManager::new();
+
+        Self {
+            event_handler: None,
             events: Events::default(),
-            renderer: None,
-            marker: std::marker::PhantomData,
+            renderer,
+            window_manager: Some(window_manager),
             last_frame_time: std::time::Instant::now(),
-        };
-        Window::run(builder.window_builder, engine);
+        }
     }
 
-    pub fn renderer(&self) -> &Renderer {
-        self.renderer.as_ref().unwrap()
+    pub fn window_manager(&mut self) -> &mut WindowManager {
+        self.window_manager.as_mut().unwrap()
     }
-    pub fn renderer_mut(&mut self) -> &mut Renderer {
-        self.renderer.as_mut().unwrap()
+
+    pub async fn run(mut self, event_handler: T) {
+        self.event_handler = Some(event_handler);
+        self.window_manager.take().unwrap().run(self);
     }
 }
 
 pub struct EngineContext<'a> {
     pub events: &'a Events,
-    pub window: &'a mut Window,
+    pub window_handle: crate::window::WindowHandle,
+    pub window_manager: &'a mut WindowManager,
     pub renderer: &'a mut Renderer,
 }
 use web_time::Duration;
 #[cfg(target_arch = "wasm32")]
 use winit::event_loop::EventLoopProxy;
 
-impl<E: EventHandler, T: EventHandlerBuilder<E>> WindowEventHandler<EngineEvent> for Engine<E, T> {
-    fn on_event(&mut self, event: WindowEvent, window: &mut Window) {
-        if self.renderer.is_none() {
-            return;
-        }
-
-        let event_handler = match &mut self.event_handler {
-            EngineApplication::Builder(_) => return,
-            EngineApplication::App(event_handler) => event_handler,
-        };
-
-        let renderer = self.renderer.as_mut().unwrap();
+impl<T: EventHandler> WindowEventHandler<EngineEvent> for Engine<T> {
+    fn on_event(
+        &mut self,
+        event: WindowEvent,
+        window_handle: crate::window::WindowHandle,
+        window_manager: &mut WindowManager,
+    ) {
         match event {
             WindowEvent::Resized((width, height)) => {
+                let window = window_manager.get_window(window_handle).unwrap();
+
                 if window.size() != (width, height) {
                     window.resize(width, height);
-                    renderer.resize(width, height);
+                    self.renderer.resize(window_handle, width, height);
                 }
                 self.events.push(event);
             }
             WindowEvent::RedrawRequested => {
-                if let crate::window::FpsPreference::Exact(fps) = window.get_fps_prefrence() {
+                if let crate::window::FpsPreference::Exact(fps) = window_manager
+                    .get_window(window_handle)
+                    .unwrap()
+                    .get_fps_prefrence()
+                {
                     #[cfg(target_arch = "wasm32")]
                     panic!();
 
@@ -84,90 +90,53 @@ impl<E: EventHandler, T: EventHandlerBuilder<E>> WindowEventHandler<EngineEvent>
                     self.last_frame_time = std::time::Instant::now();
                 }
 
-                let mut context = EngineContext {
-                    events: &self.events,
-                    window,
-                    renderer,
-                };
-                event_handler.on_update(&mut context);
+                {
+                    let mut context = EngineContext {
+                        events: &self.events,
+                        window_handle,
+                        window_manager,
+                        renderer: &mut self.renderer,
+                    };
+                    self.event_handler.as_mut().unwrap().on_update(&mut context);
+                }
 
-                renderer.begin_frame();
+                self.event_handler
+                    .as_mut()
+                    .unwrap()
+                    .on_render(&mut self.renderer);
 
-                event_handler.on_render(renderer);
-
-                renderer.present();
+                self.renderer.present();
 
                 self.events.clear();
 
-                window.request_redraw();
+                window_manager
+                    .get_window(window_handle)
+                    .unwrap()
+                    .request_redraw();
             }
-            WindowEvent::CloseRequested => window.close(),
+            WindowEvent::CloseRequested => {
+                window_manager.get_window(window_handle).unwrap().close()
+            }
             _ => self.events.push(event),
         }
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
-    fn window_created<'a>(&'a mut self, window: &'a mut Window) {
-        let mut renderer = pollster::block_on(Renderer::new(window));
-        take_mut::take(
-            &mut self.event_handler,
-            |event_handler| match event_handler {
-                EngineApplication::Builder(builder) => {
-                    EngineApplication::App(builder.build(&mut renderer))
-                }
-                v => v,
-            },
-        );
-        self.renderer = Some(renderer);
+    fn on_custom_event(&mut self, _: EngineEvent, _: &mut WindowManager) {
+        todo!()
     }
 
-    #[cfg(target_arch = "wasm32")]
-    fn window_created<'a>(
-        &'a mut self,
-        window_ref: Arc<std::sync::Mutex<Window>>,
-        event_loop_proxy: EventLoopProxy<EngineEvent>,
+    fn init(
+        &mut self,
+        window_handle: crate::window::WindowHandle,
+        window_manager: &mut WindowManager,
     ) {
-        wasm_bindgen_futures::spawn_local(async move {
-            let mutex = window_ref.as_ref();
-            let mut window = mutex.lock().unwrap();
-            let renderer = Arc::new(Mutex::new(Some(Renderer::new(&mut window).await)));
-            let _ = event_loop_proxy.send_event(EngineEvent::RendererCreated(renderer));
-        });
-    }
-
-    fn on_custom_event(&mut self, event: EngineEvent, _window: &mut Window) {
-        match event {
-            EngineEvent::RendererCreated(renderer) => {
-                let mut guard = renderer.lock().unwrap();
-                let mut renderer = guard.take().unwrap();
-                take_mut::take(
-                    &mut self.event_handler,
-                    |event_handler| match event_handler {
-                        EngineApplication::Builder(builder) => {
-                            EngineApplication::App(builder.build(&mut renderer))
-                        }
-                        v => v,
-                    },
-                );
-                self.renderer = Some(renderer);
-            }
-        }
-    }
-}
-
-#[derive(Default)]
-pub struct EngineBuilder {
-    window_builder: WindowConfig,
-}
-
-impl EngineBuilder {
-    pub fn run<E: EventHandler + 'static, T: EventHandlerBuilder<E> + 'static>(self, builder: T) {
-        Engine::run(self, builder)
-    }
-
-    pub fn with_window(mut self, window_builder: WindowConfig) -> Self {
-        self.window_builder = window_builder;
-        self
+        let mut context = EngineContext {
+            events: &self.events,
+            window_handle,
+            window_manager,
+            renderer: &mut self.renderer,
+        };
+        self.event_handler.as_mut().unwrap().init(&mut context);
     }
 }
 
@@ -211,14 +180,7 @@ impl Events {
     }
 }
 
-pub enum EngineEvent {
-    RendererCreated(Arc<Mutex<Option<Renderer>>>),
-}
-
-enum EngineApplication<E: EventHandler, T: EventHandlerBuilder<E>> {
-    Builder(T),
-    App(E),
-}
+pub enum EngineEvent {}
 
 pub trait EventHandlerBuilder<E: EventHandler> {
     fn build(self, renderer: &mut Renderer) -> E;

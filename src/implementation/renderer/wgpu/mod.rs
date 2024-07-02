@@ -1,7 +1,7 @@
-use std::marker::PhantomData;
+use std::{collections::HashMap, marker::PhantomData};
 
 use render_pass::WGPURenderPass;
-use wgpu::{util::DeviceExt, PresentMode};
+use wgpu::{util::DeviceExt, PresentMode, SurfaceTexture};
 
 use crate::{
     bind_group::{BindGroup, BindGroupLayoutEntry},
@@ -16,8 +16,7 @@ use crate::{
         },
         texture_usage, Texture, TextureDescriptor, TextureFormat,
     },
-    types::UVec2,
-    window::{Window, WindowTrait},
+    window::{WindowHandle, WindowManager, WindowManagerTrait, WindowTrait},
 };
 
 mod bind_groups;
@@ -32,10 +31,17 @@ pub struct WGPUShader {
     pub pipeline: wgpu::RenderPipeline,
 }
 
-pub struct WGPURenderer {
-    pub(crate) surface: wgpu::Surface,
-    pub(crate) device: wgpu::Device,
+pub(crate) struct Surface {
+    surface: wgpu::Surface,
     config: wgpu::SurfaceConfiguration,
+    surface_texture: Option<SurfaceTexture>,
+}
+
+pub struct WGPURenderer {
+    instance: wgpu::Instance,
+    adapter: wgpu::Adapter,
+    pub(crate) surfaces: HashMap<WindowHandle, Surface>,
+    pub(crate) device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub(crate) shaders: Vec<WGPUShader>,
     shader_descriptors: Vec<ShaderDescriptor>,
@@ -44,8 +50,6 @@ pub struct WGPURenderer {
     pub(crate) textures: Vec<Texture>,
     pub(crate) samplers: Vec<wgpu::Sampler>,
     pub(crate) buffers: Vec<wgpu::Buffer>,
-    pub(crate) surface_data: Option<(wgpu::SurfaceTexture, wgpu::TextureView)>,
-    limits: wgpu::Limits,
 }
 
 impl Drop for WGPURenderer {
@@ -55,20 +59,13 @@ impl Drop for WGPURenderer {
 }
 
 impl Janderer for WGPURenderer {
-    async fn new(window: &Window) -> Self {
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
-            ..Default::default()
-        });
+    async fn new() -> Self {
+        // inits wgpu
+        let instance = wgpu::Instance::default();
 
-        let surface = unsafe { instance.create_surface(&window) }.unwrap();
-
+        // actual physical graphics card
         let adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::default(),
-                compatible_surface: Some(&surface),
-                force_fallback_adapter: false,
-            })
+            .request_adapter(&wgpu::RequestAdapterOptions::default())
             .await
             .unwrap();
 
@@ -78,55 +75,23 @@ impl Janderer for WGPURenderer {
             wgpu::Limits::default()
         };
 
-        let (width, height) = {
-            let size = window.size();
-            (size.0, size.1)
-        };
-
+        // device is logical graphics card and queue is used for executing command buffers
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
-                    features: wgpu::Features::empty(),
-                    limits: limits.clone(),
-                    label: None,
+                    limits,
+                    ..Default::default()
                 },
                 None,
             )
             .await
             .unwrap();
 
-        let surface_capabilities = surface.get_capabilities(&adapter);
-
-        let surface_format = surface_capabilities
-            .formats
-            .iter()
-            .copied()
-            .find(|f| f.is_srgb())
-            .unwrap_or(surface_capabilities.formats[0]);
-
-        let present_mode = match window.get_fps_prefrence() {
-            crate::window::FpsPreference::Vsync => PresentMode::AutoVsync,
-            crate::window::FpsPreference::Exact(_) | crate::window::FpsPreference::Uncapped => {
-                PresentMode::Immediate
-            }
-        };
-
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface_format,
-            width,
-            height,
-            present_mode,
-            alpha_mode: surface_capabilities.alpha_modes[0],
-            view_formats: vec![],
-        };
-
-        surface.configure(&device, &config);
-
         Self {
-            surface,
+            surfaces: HashMap::new(),
+            instance,
+            adapter,
             device,
-            config,
             queue,
             textures: Vec::new(),
             samplers: Vec::new(),
@@ -135,28 +100,63 @@ impl Janderer for WGPURenderer {
             bind_groups: Vec::new(),
             bind_groups_render_data: Vec::new(),
             buffers: Vec::new(),
-            surface_data: None,
-            limits,
-        }
-    }
-    fn resize(&mut self, width: u32, height: u32) {
-        if width > 0 && height > 0 {
-            self.config.width = width;
-            self.config.height = height;
-            self.surface.configure(&self.device, &self.config);
         }
     }
 
-    fn set_width(&mut self, width: u32) {
-        self.resize(width, self.size().y)
+    fn register_window(&mut self, handle: WindowHandle, window_manager: &mut WindowManager) {
+        self.surfaces.entry(handle).or_insert({
+            let window = window_manager.get_window(handle).unwrap();
+            let surface = unsafe { self.instance.create_surface(window) }.unwrap();
+            let config = {
+                let surface_capabilities = surface.get_capabilities(&self.adapter);
+
+                let surface_format = surface_capabilities
+                    .formats
+                    .iter()
+                    .copied()
+                    .find(|f| f.is_srgb())
+                    .unwrap_or(surface_capabilities.formats[0]);
+
+                let present_mode = match window.get_fps_prefrence() {
+                    crate::window::FpsPreference::Vsync => PresentMode::AutoVsync,
+                    crate::window::FpsPreference::Exact(_)
+                    | crate::window::FpsPreference::Uncapped => PresentMode::Immediate,
+                };
+
+                let (width, height) = {
+                    let size = window.size();
+                    (size.0, size.1)
+                };
+                wgpu::SurfaceConfiguration {
+                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                    format: surface_format,
+                    width,
+                    height,
+                    present_mode,
+                    alpha_mode: surface_capabilities.alpha_modes[0],
+                    view_formats: vec![],
+                }
+            };
+
+            surface.configure(&self.device, &config);
+            Surface {
+                surface,
+                config,
+                surface_texture: None,
+            }
+        });
     }
 
-    fn set_height(&mut self, height: u32) {
-        self.resize(self.size().x, height)
-    }
+    fn resize(&mut self, handle: WindowHandle, width: u32, height: u32) {
+        if width == 0 || height == 0 {
+            return;
+        }
 
-    fn size(&self) -> UVec2 {
-        UVec2::new(self.config.width, self.config.height)
+        self.surfaces.entry(handle).and_modify(|surface| {
+            surface.config.width = width;
+            surface.config.height = height;
+            surface.surface.configure(&self.device, &surface.config);
+        });
     }
 
     fn create_uniform_buffer(&mut self, contents: &[u8]) -> BufferHandle {
@@ -202,29 +202,25 @@ impl Janderer for WGPURenderer {
         self.queue.write_buffer(&self.buffers[buffer.0], 0, data);
     }
 
-    fn begin_frame(&mut self) -> bool {
-        let surface = match self.surface.get_current_texture() {
+    fn new_pass<'renderer>(
+        &'renderer mut self,
+        window_handle: WindowHandle,
+    ) -> Box<dyn RenderPass + 'renderer> {
+        let surface = self.surfaces.get_mut(&window_handle).unwrap();
+        let surface_texture = match surface.surface.get_current_texture() {
             Ok(surface) => surface,
             Err(e) => {
                 panic!("{e}");
             }
         };
 
-        let surface_view = surface
+        let surface_view = surface_texture
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        self.surface_data = Some((surface, surface_view));
-        true
-    }
+        surface.surface_texture = Some(surface_texture);
 
-    fn present(&mut self) {
-        let surface_data = self.surface_data.take();
-        surface_data.unwrap().0.present();
-    }
-
-    fn new_pass<'renderer>(&'renderer mut self) -> Box<dyn RenderPass + 'renderer> {
-        Box::new(WGPURenderPass::new(self))
+        Box::new(WGPURenderPass::new(self, surface_view))
     }
 
     fn create_shader_at(&mut self, desc: ShaderDescriptor, handle: ShaderHandle) {
@@ -247,8 +243,14 @@ impl Janderer for WGPURenderer {
             source: wgpu::ShaderSource::Wgsl(code.clone().into()),
         };
 
+        let format = match desc.target_texture_format {
+            TextureFormat::Rgba8U => wgpu::TextureFormat::Rgba8UnormSrgb,
+            TextureFormat::Bgra8U => wgpu::TextureFormat::Bgra8UnormSrgb,
+            TextureFormat::Depth32F => wgpu::TextureFormat::Depth32Float,
+        };
+
         let targets = &[Some(wgpu::ColorTargetState {
-            format: self.config.format,
+            format,
             blend: Some(wgpu::BlendState::ALPHA_BLENDING),
             write_mask: wgpu::ColorWrites::ALL,
         })];
@@ -586,7 +588,11 @@ impl Janderer for WGPURenderer {
         None
     }
 
-    fn max_texture_size(&self) -> UVec2 {
-        UVec2::splat(self.limits.max_texture_dimension_2d)
+    fn present(&mut self) {
+        self.surfaces.iter_mut().for_each(|e| {
+            if let Some(e) = e.1.surface_texture.take() {
+                e.present()
+            }
+        });
     }
 }

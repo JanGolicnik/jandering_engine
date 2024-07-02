@@ -12,6 +12,9 @@ use super::WGPURenderer;
 
 pub struct WGPURenderPass<'renderer> {
     renderer: &'renderer mut WGPURenderer,
+
+    surface_texture_view: wgpu::TextureView,
+
     encoder: wgpu::CommandEncoder,
     shader: ShaderHandle,
     bind_groups: HashMap<u32, UntypedBindGroupHandle>,
@@ -23,7 +26,10 @@ pub struct WGPURenderPass<'renderer> {
 }
 
 impl<'renderer> WGPURenderPass<'renderer> {
-    pub fn new(renderer: &'renderer mut WGPURenderer) -> Self {
+    pub fn new(
+        renderer: &'renderer mut WGPURenderer,
+        surface_texture_view: wgpu::TextureView,
+    ) -> Self {
         let encoder = renderer
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -32,6 +38,9 @@ impl<'renderer> WGPURenderPass<'renderer> {
 
         Self {
             renderer,
+
+            surface_texture_view,
+
             encoder,
             shader: ShaderHandle(0),
             bind_groups: HashMap::new(),
@@ -79,11 +88,11 @@ impl<'renderer> RenderPass<'renderer> for WGPURenderPass<'renderer> {
             let resolve_target = Some(
                 self.resolve_target
                     .map(|tex| &self.renderer.textures[tex.0].view)
-                    .unwrap_or(&self.renderer.surface_data.as_ref().unwrap().1),
+                    .unwrap_or(&self.surface_texture_view),
             );
             (view, resolve_target)
         } else {
-            (&self.renderer.surface_data.as_ref().unwrap().1, None)
+            (&self.surface_texture_view, None)
         };
 
         let depth_stencil_attachment =

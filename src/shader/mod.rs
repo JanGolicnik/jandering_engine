@@ -1,3 +1,5 @@
+use crate::texture::TextureFormat;
+
 use super::bind_group::BindGroupLayout;
 
 #[derive(Clone)]
@@ -55,6 +57,7 @@ pub struct ShaderDescriptor {
     pub depth: bool,
     pub stripped: bool,
     pub multisample: u32,
+    pub target_texture_format: TextureFormat,
 }
 
 impl Default for ShaderDescriptor {
@@ -69,6 +72,7 @@ impl Default for ShaderDescriptor {
             depth: false,
             stripped: false,
             multisample: 1,
+            target_texture_format: TextureFormat::Bgra8U,
         }
     }
 }

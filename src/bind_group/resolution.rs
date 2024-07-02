@@ -32,10 +32,10 @@ impl BindGroup for ResolutionBindGroup {
 }
 
 impl ResolutionBindGroup {
-    pub fn new(renderer: &Renderer) -> Self {
+    pub fn new(resolution: UVec2) -> Self {
         Self {
             data: ResolutionBindGroupData {
-                resolution: [renderer.size().x, renderer.size().y],
+                resolution: resolution.into(),
                 #[cfg(target_arch = "wasm32")]
                 padding: [0.0; 2],
             },
