@@ -71,77 +71,90 @@ impl WindowManagerTrait for WinitWindowManager {
 
     fn create_window(&mut self, config: WindowConfig) -> WindowHandle {
         let handle = self.next_handle;
-        self.window_create_queue.push((handle, config));
         self.next_handle.0 += 1;
+        if let Some(event_loop) = self.active_event_loop {
+            self.actually_create_window(handle, config, event_loop);
+        } else {
+            self.window_create_queue.push((handle, config));
+        }
         handle
     }
 }
 
 impl WinitWindowManager {
-    fn create_queued_windows(&mut self, event_loop: &ActiveEventLoop) {
-        let queue = self.window_create_queue.drain(..);
-        for (handle, config) in queue {
-            let mut window_attributes = winit::window::Window::default_attributes();
-            #[cfg(target_arch = "wasm32")]
-            {
-                use winit::platform::web::WindowAttributesExtWebSys;
-                window_attributes = window_attributes.with_prevent_default(true);
-            }
+    fn actually_create_window(
+        &mut self,
+        handle: WindowHandle,
+        config: WindowConfig,
+        event_loop: &ActiveEventLoop,
+    ) {
+        let mut window_attributes = winit::window::Window::default_attributes();
+        #[cfg(target_arch = "wasm32")]
+        {
+            use winit::platform::web::WindowAttributesExtWebSys;
+            window_attributes = window_attributes.with_prevent_default(true);
+        }
 
-            #[cfg(target_arch = "wasm32")]
-            let available_size = web_sys::window()
-                .and_then(|win| win.screen().ok())
-                .and_then(|screen| {
-                    Some((
-                        screen.avail_width().unwrap_or(1) as u32,
-                        screen.avail_height().unwrap_or(1) as u32,
-                    ))
+        #[cfg(target_arch = "wasm32")]
+        let available_size = web_sys::window()
+            .and_then(|win| win.screen().ok())
+            .and_then(|screen| {
+                Some((
+                    screen.avail_width().unwrap_or(1) as u32,
+                    screen.avail_height().unwrap_or(1) as u32,
+                ))
+            })
+            .unwrap_or((1, 1));
+        #[cfg(not(target_arch = "wasm32"))]
+        let available_size = {
+            let size = event_loop.primary_monitor().unwrap().size();
+            (size.width, size.height)
+        };
+
+        let size = match config.resolution {
+            crate::window::WindowResolution::Exact { width, height } => (width, height),
+            crate::window::WindowResolution::Auto => available_size,
+        };
+
+        let position = (
+            (available_size.0 - size.0) / 2,
+            (available_size.1 - size.1) / 2,
+        );
+
+        window_attributes = window_attributes
+            .with_title(config.title)
+            .with_inner_size(winit::dpi::PhysicalSize::new(size.0, size.1))
+            .with_position(winit::dpi::PhysicalPosition::new(position.0, position.1));
+
+        let window = event_loop.create_window(window_attributes).unwrap();
+        window.set_cursor_visible(config.show_cursor);
+        #[cfg(target_arch = "wasm32")]
+        {
+            web_sys::window()
+                .and_then(|win| win.document())
+                .and_then(|doc| {
+                    let dst = doc.get_element_by_id("jandering-engine-canvas-body")?;
+                    let canvas = web_sys::Element::from(window.canvas().unwrap());
+                    dst.append_child(&canvas).ok()?;
+                    Some(())
                 })
-                .unwrap_or((1, 1));
-            #[cfg(not(target_arch = "wasm32"))]
-            let available_size = {
-                let size = event_loop.primary_monitor().unwrap().size();
-                (size.width, size.height)
-            };
+                .expect("coulnt append canvas to document body");
+        }
 
-            let size = match config.resolution {
-                crate::window::WindowResolution::Exact { width, height } => (width, height),
-                crate::window::WindowResolution::Auto => available_size,
-            };
+        let window = WinitWindow {
+            window,
+            config,
+            size,
+        };
 
-            let position = (
-                (available_size.0 - size.0) / 2,
-                (available_size.1 - size.1) / 2,
-            );
+        self.ids_to_handles.insert(window.window.id(), handle);
+        self.windows.insert(handle, window);
+    }
 
-            window_attributes = window_attributes
-                .with_title(config.title)
-                .with_inner_size(winit::dpi::PhysicalSize::new(size.0, size.1))
-                .with_position(winit::dpi::PhysicalPosition::new(position.0, position.1));
-
-            let window = event_loop.create_window(window_attributes).unwrap();
-            window.set_cursor_visible(config.show_cursor);
-            #[cfg(target_arch = "wasm32")]
-            {
-                web_sys::window()
-                    .and_then(|win| win.document())
-                    .and_then(|doc| {
-                        let dst = doc.get_element_by_id("jandering-engine-canvas-body")?;
-                        let canvas = web_sys::Element::from(window.canvas().unwrap());
-                        dst.append_child(&canvas).ok()?;
-                        Some(())
-                    })
-                    .expect("coulnt append canvas to document body");
-            }
-
-            let window = WinitWindow {
-                window,
-                config,
-                size,
-            };
-
-            self.ids_to_handles.insert(window.window.id(), handle);
-            self.windows.insert(handle, window);
+    fn create_queued_windows(&mut self, event_loop: &ActiveEventLoop) {
+        let queue = self.window_create_queue.drain(..).collect::<Vec<_>>();
+        for (handle, config) in queue {
+            self.actually_create_window(handle, config, event_loop);
         }
     }
 }
@@ -155,7 +168,6 @@ pub struct WinitWindow {
 
 impl WindowTrait for WinitWindow {
     fn resize(&mut self, width: u32, height: u32) {
-        println!("REISZED");
         let _ = self
             .window
             .request_inner_size(PhysicalSize::new(width as f32, height as f32));

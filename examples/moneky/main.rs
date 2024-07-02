@@ -12,8 +12,7 @@ use jandering_engine::{
     texture::{TextureDescriptor, TextureFormat},
     types::Vec3,
     window::{
-        InputState, Key, MouseButton, WindowConfig, WindowEvent, WindowHandle, WindowManagerTrait,
-        WindowTrait,
+        Key, MouseButton, WindowConfig, WindowEvent, WindowHandle, WindowManagerTrait, WindowTrait,
     },
 };
 
@@ -29,6 +28,8 @@ struct Application {
     camera: BindGroupHandle<MatrixCameraBindGroup>,
     is_in_fps: bool,
     depth_texture: TextureHandle,
+
+    extra_windows: Vec<WindowHandle>,
 }
 
 const CAMERA_FOV: f32 = 45.0;
@@ -117,6 +118,8 @@ impl Application {
             camera,
             is_in_fps: false,
             depth_texture,
+
+            extra_windows: Vec::new(),
         }
     }
 }
@@ -173,27 +176,11 @@ impl EventHandler for Application {
                 .unwrap();
             camera.update(context.events, dt);
 
-            if context.events.iter().any(|e| {
-                matches!(
-                    e,
-                    WindowEvent::KeyInput {
-                        key: Key::Alt,
-                        state: InputState::Pressed
-                    }
-                )
-            }) {
+            if context.events.is_pressed(Key::Alt) {
                 self.is_in_fps = false;
                 window.set_cursor_visible(true);
             }
-        } else if context.events.iter().any(|e| {
-            matches!(
-                e,
-                WindowEvent::MouseInput {
-                    button: MouseButton::Left,
-                    state: InputState::Pressed
-                }
-            )
-        }) {
+        } else if context.events.is_mouse_pressed(MouseButton::Left) {
             self.is_in_fps = true;
             window.set_cursor_visible(false);
         }
@@ -224,6 +211,19 @@ impl EventHandler for Application {
             );
         }
 
+        if context.events.is_pressed(Key::R) {
+            let handle = context.window_manager.create_window(
+                WindowConfig::default()
+                    .with_cursor(true)
+                    .with_auto_resolution()
+                    .with_title("beast"),
+            );
+            context
+                .renderer
+                .register_window(handle, context.window_manager);
+            self.extra_windows.push(handle);
+        }
+
         self.susane.instances.iter_mut().for_each(|e| {
             let position = e.model.col(3).xyz();
             let t = position.y / 1000.0;
@@ -246,6 +246,17 @@ impl EventHandler for Application {
             .bind(0, self.camera.into())
             .render(&[&self.ground, &self.susane])
             .submit();
+
+        for handle in self.extra_windows.iter() {
+            renderer
+                .new_pass(*handle)
+                .with_depth(self.depth_texture, Some(1.0))
+                .with_clear_color(0.2, 0.5, 1.0)
+                .set_shader(self.shader)
+                .bind(0, self.camera.into())
+                .render(&[&self.ground, &self.susane])
+                .submit();
+        }
     }
 }
 fn main() {

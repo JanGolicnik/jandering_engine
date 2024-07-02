@@ -2,7 +2,7 @@ use std::slice::Iter;
 
 use crate::{
     renderer::Janderer,
-    window::{WindowManager, WindowManagerTrait, WindowTrait},
+    window::{MouseButton, WindowManager, WindowManagerTrait, WindowTrait},
 };
 
 use super::{
@@ -161,6 +161,19 @@ impl Events {
             } = e
             {
                 *key == input_key
+            } else {
+                false
+            }
+        })
+    }
+    pub fn is_mouse_pressed(&self, input_button: MouseButton) -> bool {
+        self.events.iter().any(|e| {
+            if let WindowEvent::MouseInput {
+                button,
+                state: super::window::InputState::Pressed,
+            } = e
+            {
+                *button == input_button
             } else {
                 false
             }
