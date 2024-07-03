@@ -206,10 +206,7 @@ impl Janderer for WGPURenderer {
         self.queue.write_buffer(&self.buffers[buffer.0], 0, data);
     }
 
-    fn new_pass<'renderer>(
-        &'renderer mut self,
-        window_handle: WindowHandle,
-    ) -> Box<dyn RenderPass + 'renderer> {
+    fn new_pass(&mut self, window_handle: WindowHandle) -> RenderPass {
         let surface = self.surfaces.get_mut(&window_handle).unwrap();
         let surface_texture = match surface.surface.get_current_texture() {
             Ok(surface) => surface,
@@ -224,7 +221,7 @@ impl Janderer for WGPURenderer {
 
         surface.surface_texture = Some(surface_texture);
 
-        Box::new(WGPURenderPass::new(self, surface_view))
+        WGPURenderPass::new(self, surface_view)
     }
 
     fn create_shader_at(&mut self, desc: ShaderDescriptor, handle: ShaderHandle) {

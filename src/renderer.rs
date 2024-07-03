@@ -1,13 +1,10 @@
-use std::ops::Range;
-
 use crate::{
-    implementation::renderer::wgpu::WGPURenderer,
+    implementation::renderer::wgpu::{render_pass::WGPURenderPass, WGPURenderer},
     window::{WindowHandle, WindowManager},
 };
 
 use super::{
     bind_group::BindGroup,
-    object::Renderable,
     shader::ShaderDescriptor,
     texture::{sampler::SamplerDescriptor, Texture, TextureDescriptor},
 };
@@ -32,6 +29,7 @@ pub struct ShaderHandle(pub usize);
 cfg_if::cfg_if! {
     if #[cfg(feature = "wgpu")] {
         pub type Renderer = WGPURenderer;
+        pub type RenderPass<'renderer> = WGPURenderPass<'renderer>;
     }
     // else if #[cfg(feature="nekinovga")] {
     //     pub type Renderer = NekiNovga;
@@ -55,10 +53,7 @@ pub trait Janderer {
 
     fn write_buffer(&mut self, buffer: BufferHandle, data: &[u8]);
 
-    fn new_pass<'renderer>(
-        &'renderer mut self,
-        window_handle: WindowHandle,
-    ) -> Box<dyn RenderPass + 'renderer>;
+    fn new_pass(&mut self, window_handle: WindowHandle) -> RenderPass;
 
     fn create_shader_at(&mut self, desc: ShaderDescriptor, handle: ShaderHandle);
 
@@ -110,60 +105,4 @@ pub trait Janderer {
     fn write_bind_group(&mut self, handle: UntypedBindGroupHandle, data: &[u8]);
 
     fn present(&mut self);
-}
-
-pub trait RenderPass<'renderer> {
-    fn render(
-        self: Box<Self>,
-        renderables: &[&dyn Renderable],
-    ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
-
-    fn render_one(
-        self: Box<Self>,
-        renderable: &dyn Renderable,
-    ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
-
-    fn render_range(
-        self: Box<Self>,
-        renderables: &dyn Renderable,
-        range: Range<u32>,
-    ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
-
-    fn bind(
-        self: Box<Self>,
-        slot: u32,
-        bind_group: UntypedBindGroupHandle,
-    ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
-
-    fn unbind(self: Box<Self>, slot: u32) -> Box<dyn RenderPass<'renderer> + 'renderer>;
-
-    fn submit(self: Box<Self>);
-
-    fn set_shader(
-        self: Box<Self>,
-        shader: ShaderHandle,
-    ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
-
-    fn with_depth(
-        self: Box<Self>,
-        texture: TextureHandle,
-        value: Option<f32>,
-    ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
-
-    fn with_clear_color(
-        self: Box<Self>,
-        r: f32,
-        g: f32,
-        b: f32,
-    ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
-
-    fn with_alpha(self: Box<Self>, alpha: f32) -> Box<dyn RenderPass<'renderer> + 'renderer>;
-
-    //  None for resolve target means use canvas
-    #[cfg(not(target_arch = "wasm32"))]
-    fn with_target_texture_resolve(
-        self: Box<Self>,
-        target: TextureHandle,
-        resolve: Option<TextureHandle>,
-    ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
 }

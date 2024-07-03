@@ -7,6 +7,7 @@ use jandering_engine::{
     engine::{Engine, EngineContext},
     event_handler::EventHandler,
     object::{Instance, Object, Vertex},
+    render_pass::RenderPassTrait,
     renderer::{BindGroupHandle, Janderer, Renderer, ShaderHandle, TextureHandle},
     shader::ShaderDescriptor,
     texture::{TextureDescriptor, TextureFormat},

@@ -6,6 +6,7 @@ use jandering_engine::{
     engine::{Engine, EngineContext},
     event_handler::EventHandler,
     object::{Instance, Object, Vertex},
+    render_pass::RenderPassTrait,
     renderer::{BindGroupHandle, Janderer, Renderer, ShaderHandle, TextureHandle},
     shader::ShaderDescriptor,
     texture::{TextureDescriptor, TextureFormat},
@@ -172,7 +173,7 @@ impl EventHandler for Application {
         renderer
             .new_pass(self.window_handle)
             .with_depth(self.depth_texture, Some(1.0))
-            .with_alpha(0.01)
+            .with_alpha(0.001)
             .set_shader(self.shader)
             .bind(0, self.camera.into())
             .render(&[&self.cube])
