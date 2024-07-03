@@ -244,6 +244,8 @@ pub struct WindowConfig {
     pub resolution: WindowResolution,
     pub show_cursor: bool,
     pub fps_preference: FpsPreference,
+    pub transparent: bool,
+    pub decorations: bool,
 }
 
 impl Default for WindowConfig {
@@ -253,6 +255,8 @@ impl Default for WindowConfig {
             show_cursor: true,
             title: "Cool app",
             fps_preference: FpsPreference::Vsync,
+            transparent: false,
+            decorations: true,
         }
     }
 }
@@ -279,6 +283,15 @@ impl WindowConfig {
     }
     pub fn with_fps_preference(mut self, fps_preference: FpsPreference) -> Self {
         self.fps_preference = fps_preference;
+        self
+    }
+
+    pub fn with_transparency(mut self, value: bool) -> Self {
+        self.transparent = value;
+        self
+    }
+    pub fn with_decorations(mut self, value: bool) -> Self {
+        self.decorations = value;
         self
     }
 }

@@ -124,6 +124,8 @@ impl WinitWindowManager {
         window_attributes = window_attributes
             .with_title(config.title)
             .with_inner_size(winit::dpi::PhysicalSize::new(size.0, size.1))
+            .with_transparent(config.transparent)
+            .with_decorations(config.decorations)
             .with_position(winit::dpi::PhysicalPosition::new(position.0, position.1));
 
         let window = event_loop.create_window(window_attributes).unwrap();
@@ -141,11 +143,7 @@ impl WinitWindowManager {
                 .expect("coulnt append canvas to document body");
         }
 
-        let window = WinitWindow {
-            window,
-            config,
-            size,
-        };
+        let window = WinitWindow { window, config };
 
         self.ids_to_handles.insert(window.window.id(), handle);
         self.windows.insert(handle, window);
@@ -163,7 +161,6 @@ impl WinitWindowManager {
 pub struct WinitWindow {
     window: winit::window::Window,
     config: WindowConfig,
-    size: (u32, u32),
 }
 
 impl WindowTrait for WinitWindow {
@@ -178,15 +175,16 @@ impl WindowTrait for WinitWindow {
     }
 
     fn size(&self) -> (u32, u32) {
-        self.size
+        let size = self.window.inner_size();
+        (size.width, size.height)
     }
 
     fn width(&self) -> u32 {
-        self.size.0
+        self.size().0
     }
 
     fn height(&self) -> u32 {
-        self.size.1
+        self.size().1
     }
 
     fn request_redraw(&mut self) {

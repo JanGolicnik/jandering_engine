@@ -6,7 +6,7 @@ use crate::{
     },
 };
 
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Range};
 
 use super::WGPURenderer;
 
@@ -23,6 +23,7 @@ pub struct WGPURenderPass<'renderer> {
     depth_tex: Option<TextureHandle>,
     target: Option<TextureHandle>,
     resolve_target: Option<TextureHandle>,
+    alpha: f32,
 }
 
 impl<'renderer> WGPURenderPass<'renderer> {
@@ -49,6 +50,8 @@ impl<'renderer> WGPURenderPass<'renderer> {
             depth_tex: None,
             target: None,
             resolve_target: None,
+
+            alpha: 1.0,
         }
     }
 }
@@ -118,10 +121,10 @@ impl<'renderer> RenderPass<'renderer> for WGPURenderPass<'renderer> {
                 ops: wgpu::Operations {
                     load: if let Some(color) = self.clear_color {
                         wgpu::LoadOp::Clear(wgpu::Color {
-                            r: color.x as f64,
-                            g: color.y as f64,
-                            b: color.z as f64,
-                            a: 1.0,
+                            r: color.x as f64 * self.alpha as f64,
+                            g: color.y as f64 * self.alpha as f64,
+                            b: color.z as f64 * self.alpha as f64,
+                            a: self.alpha as f64,
                         })
                     } else {
                         wgpu::LoadOp::Load
@@ -230,6 +233,14 @@ impl<'renderer> RenderPass<'renderer> for WGPURenderPass<'renderer> {
     ) -> Box<dyn RenderPass<'renderer> + 'renderer> {
         self.target = Some(target);
         self.resolve_target = resolve;
+        self
+    }
+
+    fn with_alpha(mut self: Box<Self>, alpha: f32) -> Box<dyn RenderPass<'renderer> + 'renderer> {
+        self.alpha = alpha;
+        if self.clear_color.is_none() {
+            self.clear_color = Some(Vec3::splat(1.0));
+        }
         self
     }
 }

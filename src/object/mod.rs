@@ -131,9 +131,10 @@ impl Instance {
         self
     }
 
-    pub fn rotate(mut self, angle_rad: f32, axis: Vec3) -> Self {
-        let rotation_mat = Mat4::from_axis_angle(axis, angle_rad);
-        self.model = rotation_mat * self.model;
+    pub fn rotate(&mut self, angle_rad: f32, axis: Vec3) -> &mut Self {
+        let (scale, rotation, translation) = self.model.to_scale_rotation_translation();
+        let new_rot = Qua::from_axis_angle(axis, angle_rad);
+        self.model = Mat4::from_scale_rotation_translation(scale, rotation * new_rot, translation);
         self.inv_model = self.model.inverse();
         self
     }

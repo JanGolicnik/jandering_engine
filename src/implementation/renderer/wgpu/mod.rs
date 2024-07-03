@@ -153,6 +153,10 @@ impl Janderer for WGPURenderer {
         }
 
         self.surfaces.entry(handle).and_modify(|surface| {
+            if surface.config.width == width && surface.config.height == height {
+                return;
+            }
+
             surface.config.width = width;
             surface.config.height = height;
             surface.surface.configure(&self.device, &surface.config);

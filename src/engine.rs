@@ -64,12 +64,7 @@ impl<T: EventHandler> WindowEventHandler<EngineEvent> for Engine<T> {
     ) {
         match event {
             WindowEvent::Resized((width, height)) => {
-                let window = window_manager.get_window(window_handle).unwrap();
-
-                if window.size() != (width, height) {
-                    window.resize(width, height);
-                    self.renderer.resize(window_handle, width, height);
-                }
+                self.renderer.resize(window_handle, width, height);
                 self.events.push(event);
             }
             WindowEvent::RedrawRequested => {

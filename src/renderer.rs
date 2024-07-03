@@ -157,6 +157,8 @@ pub trait RenderPass<'renderer> {
         b: f32,
     ) -> Box<dyn RenderPass<'renderer> + 'renderer>;
 
+    fn with_alpha(self: Box<Self>, alpha: f32) -> Box<dyn RenderPass<'renderer> + 'renderer>;
+
     //  None for resolve target means use canvas
     #[cfg(not(target_arch = "wasm32"))]
     fn with_target_texture_resolve(
