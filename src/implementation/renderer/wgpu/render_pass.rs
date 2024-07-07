@@ -149,4 +149,55 @@ impl<'renderer> RenderPassTrait for WGPURenderPass<'renderer> {
     fn get_data(&mut self) -> &mut RenderPassData {
         &mut self.data
     }
+
+    fn render_empty(mut self) -> Self
+    where
+        Self: Sized,
+    {
+        let RenderPassData {
+            clear_color,
+            alpha,
+            target,
+            resolve_target,
+            ..
+        } = &self.data;
+
+        let (view, resolve_target) = if let Some(tex) = target {
+            let view = &self.renderer.textures[tex.0].view;
+            let resolve_target = Some(
+                resolve_target
+                    .map(|tex| &self.renderer.textures[tex.0].view)
+                    .unwrap_or(&self.surface_texture_view),
+            );
+            (view, resolve_target)
+        } else {
+            (&self.surface_texture_view, None)
+        };
+
+        self.encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("Render Pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                resolve_target,
+                ops: wgpu::Operations {
+                    load: if let Some(color) = clear_color {
+                        wgpu::LoadOp::Clear(wgpu::Color {
+                            r: color.x as f64 * *alpha as f64,
+                            g: color.y as f64 * *alpha as f64,
+                            b: color.z as f64 * *alpha as f64,
+                            a: *alpha as f64,
+                        })
+                    } else {
+                        wgpu::LoadOp::Load
+                    },
+                    ..Default::default()
+                },
+            })],
+            depth_stencil_attachment: None,
+            occlusion_query_set: None,
+            timestamp_writes: None,
+        });
+
+        self
+    }
 }

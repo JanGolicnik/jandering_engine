@@ -157,6 +157,10 @@ impl Instance {
         self.model.to_scale_rotation_translation().2
     }
 
+    pub fn size(&self) -> Vec3 {
+        self.model.to_scale_rotation_translation().0
+    }
+
     pub fn rotation(&self) -> Qua {
         self.model.to_scale_rotation_translation().1
     }

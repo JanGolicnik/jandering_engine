@@ -13,7 +13,8 @@ use jandering_engine::{
     texture::{TextureDescriptor, TextureFormat},
     types::Vec3,
     window::{
-        Key, MouseButton, WindowConfig, WindowEvent, WindowHandle, WindowManagerTrait, WindowTrait,
+        Key, MouseButton, WindowConfig, WindowEvent, WindowHandle, WindowManager,
+        WindowManagerTrait, WindowTrait,
     },
 };
 
@@ -127,18 +128,15 @@ impl Application {
 
 #[async_trait::async_trait]
 impl EventHandler for Application {
-    fn init(&mut self, context: &mut EngineContext<'_>) {
-        context
-            .renderer
-            .register_window(self.window_handle, context.window_manager);
+    fn init(&mut self, renderer: &mut Renderer, window_manager: &mut WindowManager) {
+        renderer.register_window(self.window_handle, window_manager);
 
-        let resolution = context
-            .window_manager
+        let resolution = window_manager
             .get_window(self.window_handle)
             .unwrap()
             .size();
 
-        context.renderer.re_create_texture(
+        renderer.re_create_texture(
             TextureDescriptor {
                 size: resolution.into(),
                 format: TextureFormat::Depth32F,
@@ -147,8 +145,7 @@ impl EventHandler for Application {
             self.depth_texture,
         );
 
-        context
-            .renderer
+        renderer
             .get_typed_bind_group_mut(self.camera)
             .unwrap()
             .make_perspective(
@@ -175,19 +172,19 @@ impl EventHandler for Application {
                 .renderer
                 .get_typed_bind_group_mut(self.camera)
                 .unwrap();
-            camera.update(context.events, dt);
+            camera.update(window.events(), dt);
 
-            if context.events.is_pressed(Key::Alt) {
+            if window.events().is_pressed(Key::Alt) {
                 self.is_in_fps = false;
                 window.set_cursor_visible(true);
             }
-        } else if context.events.is_mouse_pressed(MouseButton::Left) {
+        } else if window.events().is_mouse_pressed(MouseButton::Left) {
             self.is_in_fps = true;
             window.set_cursor_visible(false);
         }
 
-        if context
-            .events
+        if window
+            .events()
             .iter()
             .any(|e| matches!(e, WindowEvent::Resized(_)))
         {
@@ -212,7 +209,7 @@ impl EventHandler for Application {
             );
         }
 
-        if context.events.is_pressed(Key::R) {
+        if window.events().is_pressed(Key::R) {
             let handle = context.window_manager.create_window(
                 WindowConfig::default()
                     .with_cursor(true)
@@ -234,7 +231,7 @@ impl EventHandler for Application {
         self.susane.update(context.renderer);
     }
 
-    fn on_render(&mut self, renderer: &mut Renderer) {
+    fn on_render(&mut self, renderer: &mut Renderer, _: WindowHandle, _: &mut WindowManager) {
         let camera = renderer.get_typed_bind_group_mut(self.camera).unwrap();
         let data = camera.get_data();
         renderer.write_bind_group(self.camera.into(), &data);

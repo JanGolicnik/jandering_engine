@@ -1,4 +1,5 @@
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
+use web_time::Duration;
 use winit::{
     application::ApplicationHandler,
     dpi::{PhysicalPosition, PhysicalSize},
@@ -10,8 +11,10 @@ use winit::{
 
 use crate::{
     engine::EngineEvent,
+    types::IVec2,
     window::{
-        Window, WindowConfig, WindowEventHandler, WindowHandle, WindowManagerTrait, WindowTrait,
+        Events, Window, WindowConfig, WindowEventHandler, WindowHandle, WindowManagerTrait,
+        WindowTrait,
     },
 };
 
@@ -143,8 +146,12 @@ impl WinitWindowManager {
                 .expect("coulnt append canvas to document body");
         }
 
-        let window = WinitWindow { window, config };
-
+        let window = WinitWindow {
+            window,
+            config,
+            events: Events::default(),
+            last_redraw_time: web_time::Instant::now(),
+        };
         self.ids_to_handles.insert(window.window.id(), handle);
         self.windows.insert(handle, window);
     }
@@ -157,10 +164,138 @@ impl WinitWindowManager {
     }
 }
 
+impl ApplicationHandler<EngineEvent> for WinitWindowManager {
+    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        self.create_queued_windows(event_loop);
+
+        let mut event_handler = self.event_handler.take().unwrap();
+        self.active_event_loop = Some(unsafe {
+            std::mem::transmute::<&ActiveEventLoop, &'static ActiveEventLoop>(event_loop)
+        });
+
+        event_handler.init(self);
+
+        self.event_handler = Some(event_handler);
+    }
+
+    fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: EngineEvent) {
+        let mut event_handler = self.event_handler.take().unwrap();
+        event_handler.on_custom_event(event, self);
+        self.event_handler = Some(event_handler);
+    }
+
+    fn device_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        _: event::DeviceId,
+        event: event::DeviceEvent,
+    ) {
+        if event_loop.exiting() {
+            return;
+        }
+
+        for (_, window) in self.windows.iter_mut() {
+            if let event::DeviceEvent::MouseMotion { delta } = event {
+                window
+                    .events
+                    .push(crate::window::WindowEvent::RawMouseMotion((
+                        delta.0 as f32,
+                        delta.1 as f32,
+                    )));
+            }
+        }
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        window_id: winit::window::WindowId,
+        event: WindowEvent,
+    ) {
+        if event_loop.exiting() {
+            return;
+        }
+
+        if !matches!(
+            event_loop.control_flow(),
+            winit::event_loop::ControlFlow::Poll
+        ) {
+            event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
+        }
+
+        let Some((window, handle)) = self
+            .ids_to_handles
+            .get(&window_id)
+            .and_then(|handle| self.windows.get_mut(handle).map(|win| (win, handle)))
+        else {
+            return;
+        };
+
+        let Some(event) = winit_event_to_window_event(&event) else {
+            return;
+        };
+
+        if self.is_init {
+            if let crate::window::WindowEvent::Resized(_) = event {
+                self.is_init = false;
+                return;
+            }
+        }
+
+        window.handle_event(event);
+
+        self.active_event_loop = Some(unsafe {
+            std::mem::transmute::<&ActiveEventLoop, &'static ActiveEventLoop>(event_loop)
+        });
+
+        let mut event_handler = self.event_handler.take().unwrap();
+
+        event_handler.on_event(event, *handle, self);
+
+        self.event_handler = Some(event_handler);
+
+        self.active_event_loop = None;
+    }
+
+    fn about_to_wait(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        if self.should_close {
+            event_loop.exit();
+            return;
+        }
+
+        self.create_queued_windows(event_loop);
+    }
+}
+
 #[allow(dead_code)]
 pub struct WinitWindow {
     window: winit::window::Window,
     config: WindowConfig,
+    pub(crate) events: Events,
+    last_redraw_time: std::time::Instant,
+}
+
+impl WinitWindow {
+    fn handle_event(&mut self, event: crate::window::WindowEvent) {
+        match event {
+            crate::window::WindowEvent::RedrawRequested => {
+                if let crate::window::FpsPreference::Exact(fps) = self.get_fps_prefrence() {
+                    #[cfg(target_arch = "wasm32")]
+                    panic!();
+
+                    let now = std::time::Instant::now();
+                    let dt = now - self.last_redraw_time;
+                    let min_dt = Duration::from_millis(1000 / fps as u64);
+                    if dt < min_dt {
+                        std::thread::sleep(min_dt - dt);
+                    }
+                    self.last_redraw_time = std::time::Instant::now();
+                }
+            }
+            crate::window::WindowEvent::CloseRequested => self.close(),
+            _ => self.events.push(event),
+        }
+    }
 }
 
 impl WindowTrait for WinitWindow {
@@ -246,8 +381,31 @@ impl WindowTrait for WinitWindow {
             .request_user_attention(Some(UserAttentionType::Critical));
     }
 
+    fn position(&self) -> (i32, i32) {
+        let position = self.window.outer_position().unwrap();
+        (position.x, position.y)
+    }
+
     fn set_position(&mut self, x: i32, y: i32) {
         self.window.set_outer_position(PhysicalPosition::new(x, y));
+    }
+
+    fn set_absolute_position(&mut self, x: i32, y: i32) {
+        let mut monitors = self.window.available_monitors();
+        let mut top_left = monitors.next().unwrap().position();
+        for monitor in monitors {
+            top_left.x = top_left.x.min(monitor.position().x);
+            top_left.y = top_left.y.min(monitor.position().y);
+        }
+        let current_position = self.window.current_monitor().unwrap().position();
+
+        let top_left = IVec2::new(top_left.x, top_left.y);
+        let current_position = IVec2::new(current_position.x, current_position.y);
+        let target_position = IVec2::new(x, y);
+
+        let new_position = (top_left - current_position) + target_position;
+        self.window
+            .set_outer_position(PhysicalPosition::new(new_position.x, new_position.y));
     }
 
     fn set_as_desktop(&mut self) {
@@ -277,6 +435,7 @@ impl WindowTrait for WinitWindow {
                     ),
                 )
                 .unwrap();
+
                 windows::Win32::UI::WindowsAndMessaging::SetParent(
                     windows::Win32::Foundation::HWND(handle.hwnd as isize),
                     hwnd,
@@ -284,11 +443,27 @@ impl WindowTrait for WinitWindow {
 
                 self.window
                     .set_outer_position(PhysicalPosition::new(-10, -40));
-                let mut size = (0, 0);
+                let mut monitors = self.window.available_monitors();
+                let (mut top, mut left, mut bottom, mut right) = {
+                    let monitor = monitors.next().unwrap();
+                    let pos = monitor.position();
+                    let size = monitor.size();
+                    (
+                        pos.y,
+                        pos.x,
+                        pos.y + size.height as i32,
+                        pos.x + size.width as i32,
+                    )
+                };
                 for monitor in self.window.available_monitors() {
-                    size.0 += monitor.size().width;
-                    size.1 = size.1.max(monitor.size().height);
+                    let pos = monitor.position();
+                    let size = monitor.size();
+                    top = top.min(pos.y);
+                    left = left.min(pos.x);
+                    bottom = bottom.max(pos.y + size.height as i32);
+                    right = right.max(pos.x + size.width as i32);
                 }
+                let size = (right - left, bottom - top);
                 let _ = self
                     .window
                     .request_inner_size(PhysicalSize::new(size.0, size.1));
@@ -312,80 +487,9 @@ impl WindowTrait for WinitWindow {
     fn get_fps_prefrence(&self) -> crate::window::FpsPreference {
         self.config.fps_preference
     }
-}
 
-impl ApplicationHandler<EngineEvent> for WinitWindowManager {
-    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        self.create_queued_windows(event_loop);
-        let mut event_handler = self.event_handler.take().unwrap();
-        self.active_event_loop = Some(unsafe {
-            std::mem::transmute::<&ActiveEventLoop, &'static ActiveEventLoop>(event_loop)
-        });
-
-        let handles = self.windows.keys().cloned().collect::<Vec<_>>();
-        for handle in handles {
-            event_handler.init(handle, self);
-        }
-
-        self.event_handler = Some(event_handler);
-    }
-
-    fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: EngineEvent) {
-        let mut event_handler = self.event_handler.take().unwrap();
-        event_handler.on_custom_event(event, self);
-        self.event_handler = Some(event_handler);
-    }
-
-    fn window_event(
-        &mut self,
-        event_loop: &winit::event_loop::ActiveEventLoop,
-        window_id: winit::window::WindowId,
-        event: WindowEvent,
-    ) {
-        if event_loop.exiting() {
-            return;
-        }
-
-        if !matches!(
-            event_loop.control_flow(),
-            winit::event_loop::ControlFlow::Poll
-        ) {
-            event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
-        }
-
-        let Some(handle) = self.ids_to_handles.get(&window_id) else {
-            return;
-        };
-
-        let Some(event) = winit_event_to_window_event(&event) else {
-            return;
-        };
-
-        if self.is_init {
-            if let crate::window::WindowEvent::Resized(_) = event {
-                self.is_init = false;
-                return;
-            }
-        }
-
-        let mut event_handler = self.event_handler.take().unwrap();
-
-        self.active_event_loop = Some(unsafe {
-            std::mem::transmute::<&ActiveEventLoop, &'static ActiveEventLoop>(event_loop)
-        });
-
-        event_handler.on_event(event, *handle, self);
-
-        self.event_handler = Some(event_handler);
-    }
-
-    fn about_to_wait(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        if self.should_close {
-            event_loop.exit();
-            return;
-        }
-
-        self.create_queued_windows(event_loop);
+    fn events(&self) -> &Events {
+        &self.events
     }
 }
 
@@ -415,6 +519,7 @@ unsafe extern "system" fn enum_windows_proc(
     }
     windows::Win32::Foundation::TRUE
 }
+
 fn winit_event_to_window_event(event: &WindowEvent) -> Option<crate::window::WindowEvent> {
     let e = match event {
         WindowEvent::CursorEntered { .. } => crate::window::WindowEvent::MouseEntered,

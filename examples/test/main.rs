@@ -11,7 +11,9 @@ use jandering_engine::{
     shader::ShaderDescriptor,
     texture::{TextureDescriptor, TextureFormat},
     types::{UVec2, Vec3},
-    window::{WindowConfig, WindowEvent, WindowHandle, WindowManagerTrait, WindowTrait},
+    window::{
+        WindowConfig, WindowEvent, WindowHandle, WindowManager, WindowManagerTrait, WindowTrait,
+    },
 };
 
 struct Application {
@@ -84,18 +86,14 @@ impl Application {
 
 #[async_trait::async_trait]
 impl EventHandler for Application {
-    fn init(&mut self, context: &mut EngineContext<'_>) {
-        context
-            .renderer
-            .register_window(self.window_handle, context.window_manager);
-
-        let resolution = context
-            .window_manager
+    fn init(&mut self, renderer: &mut Renderer, window_manager: &mut WindowManager) {
+        renderer.register_window(self.window_handle, window_manager);
+        let resolution = window_manager
             .get_window(self.window_handle)
             .unwrap()
             .size();
 
-        context.renderer.re_create_texture(
+        renderer.re_create_texture(
             TextureDescriptor {
                 size: resolution.into(),
                 format: TextureFormat::Depth32F,
@@ -104,8 +102,7 @@ impl EventHandler for Application {
             self.depth_texture,
         );
 
-        context
-            .renderer
+        renderer
             .get_typed_bind_group_mut(self.camera)
             .unwrap()
             .make_perspective(
@@ -130,10 +127,10 @@ impl EventHandler for Application {
             .renderer
             .get_typed_bind_group_mut(self.camera)
             .unwrap();
-        camera.update(context.events, dt);
+        camera.update(window.events(), dt);
 
-        if context
-            .events
+        if window
+            .events()
             .iter()
             .any(|e| matches!(e, WindowEvent::Resized(_)))
         {
@@ -165,7 +162,7 @@ impl EventHandler for Application {
         self.cube.update(context.renderer);
     }
 
-    fn on_render(&mut self, renderer: &mut Renderer) {
+    fn on_render(&mut self, renderer: &mut Renderer, _: WindowHandle, _: &mut WindowManager) {
         let camera = renderer.get_typed_bind_group_mut(self.camera).unwrap();
         let data = camera.get_data();
         renderer.write_bind_group(self.camera.into(), &data);
@@ -173,7 +170,7 @@ impl EventHandler for Application {
         renderer
             .new_pass(self.window_handle)
             .with_depth(self.depth_texture, Some(1.0))
-            .with_alpha(0.001)
+            .with_alpha(0.0)
             .set_shader(self.shader)
             .bind(0, self.camera.into())
             .render(&[&self.cube])

@@ -1,9 +1,8 @@
 use crate::{
     bind_group::{BindGroup, BindGroupLayout, BindGroupLayoutEntry},
-    engine::Events,
     renderer::{BufferHandle, Janderer, Renderer},
     types::{Mat4, Vec2, Vec3},
-    window::{InputState, Key, WindowEvent},
+    window::{Events, InputState, Key, WindowEvent},
 };
 
 use self::constants::*;
@@ -106,6 +105,10 @@ impl MatrixCameraBindGroup {
         far: f32,
     ) {
         self.proj = Mat4::orthographic_rh(left, right, bottom, top, near, far);
+    }
+
+    pub fn matrix(&self) -> Mat4 {
+        self.data.view_proj
     }
 
     pub fn update_data(&mut self) {

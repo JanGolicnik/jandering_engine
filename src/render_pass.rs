@@ -27,13 +27,17 @@ impl Default for RenderPassData {
             depth_tex: Default::default(),
             target: Default::default(),
             resolve_target: Default::default(),
-            alpha: Default::default(),
+            alpha: 1.0,
         }
     }
 }
 
 pub trait RenderPassTrait {
     fn get_data(&mut self) -> &mut RenderPassData;
+
+    fn render_empty(self) -> Self
+    where
+        Self: Sized;
 
     fn render(self, renderables: &[&dyn Renderable]) -> Self
     where

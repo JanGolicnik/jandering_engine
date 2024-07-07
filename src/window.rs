@@ -7,7 +7,7 @@ pub type Window = WinitWindow;
 pub type WindowManager = WinitWindowManager;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
-pub struct WindowHandle(pub(crate) u32);
+pub struct WindowHandle(pub u32);
 
 pub trait WindowManagerTrait {
     fn new() -> Self;
@@ -22,7 +22,11 @@ pub trait WindowManagerTrait {
 pub trait WindowTrait {
     fn resize(&mut self, width: u32, height: u32);
 
+    fn position(&self) -> (i32, i32);
+
     fn set_position(&mut self, x: i32, y: i32);
+
+    fn set_absolute_position(&mut self, x: i32, y: i32);
 
     fn set_cursor_position(&self, x: u32, y: u32);
 
@@ -65,6 +69,8 @@ pub trait WindowTrait {
     fn focus_window(&mut self);
 
     fn request_user_attention(&mut self);
+
+    fn events(&self) -> &Events;
 
     fn get_raw_window_handle(&self) -> raw_window_handle::RawWindowHandle;
 
@@ -208,6 +214,7 @@ pub enum WindowEvent {
     ScaleFactorChanged(f32),
 
     MouseMotion((f32, f32)),
+    RawMouseMotion((f32, f32)),
 
     Scroll((f32, f32)),
 
@@ -304,11 +311,7 @@ use std::sync::Arc;
 use winit::event_loop::EventLoopProxy;
 
 pub trait WindowEventHandler<T> {
-    fn init(
-        &mut self,
-        window_handle: crate::window::WindowHandle,
-        window_manager: &mut WindowManager,
-    );
+    fn init(&mut self, window_manager: &mut WindowManager);
 
     fn on_event(
         &mut self,
@@ -318,4 +321,57 @@ pub trait WindowEventHandler<T> {
     );
 
     fn on_custom_event(&mut self, event: T, window_manager: &mut WindowManager);
+}
+
+#[derive(Default, Debug)]
+pub struct Events {
+    events: Vec<WindowEvent>,
+}
+
+impl Events {
+    pub fn matches<F>(&self, f: F) -> bool
+    where
+        F: Fn(&WindowEvent) -> bool,
+    {
+        self.events.iter().any(f)
+    }
+
+    pub fn is_pressed(&self, input_key: Key) -> bool {
+        self.events.iter().any(|e| {
+            if let WindowEvent::KeyInput {
+                key,
+                state: super::window::InputState::Pressed,
+            } = e
+            {
+                *key == input_key
+            } else {
+                false
+            }
+        })
+    }
+    pub fn is_mouse_pressed(&self, input_button: MouseButton) -> bool {
+        self.events.iter().any(|e| {
+            if let WindowEvent::MouseInput {
+                button,
+                state: super::window::InputState::Pressed,
+            } = e
+            {
+                *button == input_button
+            } else {
+                false
+            }
+        })
+    }
+
+    pub fn push(&mut self, event: WindowEvent) {
+        self.events.push(event)
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<WindowEvent> {
+        self.events.iter()
+    }
+
+    pub fn clear(&mut self) {
+        self.events.clear()
+    }
 }
