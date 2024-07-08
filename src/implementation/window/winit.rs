@@ -391,19 +391,18 @@ impl WindowTrait for WinitWindow {
     }
 
     fn set_absolute_position(&mut self, x: i32, y: i32) {
+        let target_position = IVec2::new(x, y);
+        
         let mut monitors = self.window.available_monitors();
         let mut top_left = monitors.next().unwrap().position();
         for monitor in monitors {
             top_left.x = top_left.x.min(monitor.position().x);
             top_left.y = top_left.y.min(monitor.position().y);
         }
-        let current_position = self.window.current_monitor().unwrap().position();
-
         let top_left = IVec2::new(top_left.x, top_left.y);
-        let current_position = IVec2::new(current_position.x, current_position.y);
-        let target_position = IVec2::new(x, y);
 
-        let new_position = (top_left - current_position) + target_position;
+        let new_position = top_left + target_position;
+
         self.window
             .set_outer_position(PhysicalPosition::new(new_position.x, new_position.y));
     }
