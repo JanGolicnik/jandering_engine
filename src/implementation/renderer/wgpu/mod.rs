@@ -1,15 +1,17 @@
 use std::{collections::HashMap, marker::PhantomData};
 
+use compute_pass::WGPUComputePass;
 use render_pass::WGPURenderPass;
-use wgpu::{util::DeviceExt, PresentMode, SurfaceTexture};
+use wgpu::{util::DeviceExt, ComputePipelineDescriptor, Features, PresentMode, SurfaceTexture};
 
 use crate::{
     bind_group::{BindGroup, BindGroupLayoutEntry},
+    engine::EngineConfig,
     renderer::{
-        BindGroupHandle, BufferHandle, Janderer, RenderPass, SamplerHandle, ShaderHandle,
-        TextureHandle, UntypedBindGroupHandle,
+        BindGroupHandle, BufferHandle, ComputeShaderHandle, Janderer, RenderPass, SamplerHandle,
+        ShaderHandle, TextureHandle, UntypedBindGroupHandle,
     },
-    shader::ShaderDescriptor,
+    shader::{ComputeShaderDescriptor, ShaderDescriptor},
     texture::{
         sampler::{
             SamplerAddressMode, SamplerCompareFunction, SamplerDescriptor, SamplerFilterMode,
@@ -20,6 +22,7 @@ use crate::{
 };
 
 mod bind_groups;
+pub mod compute_pass;
 pub mod render_pass;
 
 struct WGPUBindGroupRenderData {
@@ -31,6 +34,10 @@ pub struct WGPUShader {
     pub pipeline: wgpu::RenderPipeline,
 }
 
+pub struct WGPUComputeShader {
+    pub pipeline: wgpu::ComputePipeline,
+}
+
 pub(crate) struct Surface {
     surface: wgpu::Surface,
     config: wgpu::SurfaceConfiguration,
@@ -40,26 +47,28 @@ pub(crate) struct Surface {
 pub struct WGPURenderer {
     instance: wgpu::Instance,
     adapter: wgpu::Adapter,
-    pub(crate) surfaces: HashMap<WindowHandle, Surface>,
     pub(crate) device: wgpu::Device,
-    pub queue: wgpu::Queue,
+    pub(crate) queue: wgpu::Queue,
+
+    pub(crate) surfaces: HashMap<WindowHandle, Surface>,
+
     pub(crate) shaders: Vec<WGPUShader>,
     shader_descriptors: Vec<ShaderDescriptor>,
+
+    pub(crate) compute_shaders: Vec<WGPUComputeShader>,
+    compute_shader_descriptors: Vec<ComputeShaderDescriptor>,
+
     bind_groups: Vec<Box<dyn BindGroup>>,
     bind_groups_render_data: Vec<WGPUBindGroupRenderData>,
+
     pub(crate) textures: Vec<Texture>,
     pub(crate) samplers: Vec<wgpu::Sampler>,
+
     pub(crate) buffers: Vec<wgpu::Buffer>,
 }
 
-impl Drop for WGPURenderer {
-    fn drop(&mut self) {
-        log::info!("HEYY")
-    }
-}
-
 impl Janderer for WGPURenderer {
-    async fn new() -> Self {
+    async fn new(config: EngineConfig) -> Self {
         // inits wgpu
         let instance = wgpu::Instance::default();
 
@@ -75,30 +84,44 @@ impl Janderer for WGPURenderer {
             wgpu::Limits::default()
         };
 
+        let device_descriptor = {
+            let mut features = Features::empty();
+            if config.enable_compute {
+                features.insert(Features::VERTEX_WRITABLE_STORAGE)
+            };
+            &wgpu::DeviceDescriptor {
+                limits,
+                features,
+                ..Default::default()
+            }
+        };
+
         // device is logical graphics card and queue is used for executing command buffers
         let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    limits,
-                    ..Default::default()
-                },
-                None,
-            )
+            .request_device(device_descriptor, None)
             .await
             .unwrap();
 
         Self {
-            surfaces: HashMap::new(),
             instance,
             adapter,
             device,
             queue,
+
+            surfaces: HashMap::new(),
+
             textures: Vec::new(),
             samplers: Vec::new(),
+
             shaders: Vec::new(),
             shader_descriptors: Vec::new(),
+
+            compute_shaders: Vec::new(),
+            compute_shader_descriptors: Vec::new(),
+
             bind_groups: Vec::new(),
             bind_groups_render_data: Vec::new(),
+
             buffers: Vec::new(),
         }
     }
@@ -173,7 +196,32 @@ impl Janderer for WGPURenderer {
             });
 
         self.buffers.push(buffer);
-        BufferHandle(self.buffers.len() - 1)
+        BufferHandle::uniform(self.buffers.len() - 1)
+    }
+
+    fn create_storage_buffer(&mut self, contents: &[u8]) -> BufferHandle {
+        let buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents,
+                usage: wgpu::BufferUsages::STORAGE,
+            });
+
+        self.buffers.push(buffer);
+        BufferHandle::storage(self.buffers.len() - 1)
+    }
+
+    fn create_storage_buffer_with_size(&mut self, size: usize) -> BufferHandle {
+        let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size: size as u64,
+            usage: wgpu::BufferUsages::STORAGE,
+            mapped_at_creation: false,
+        });
+
+        self.buffers.push(buffer);
+        BufferHandle::storage(self.buffers.len() - 1)
     }
 
     fn create_vertex_buffer(&mut self, contents: &[u8]) -> BufferHandle {
@@ -186,7 +234,7 @@ impl Janderer for WGPURenderer {
             });
 
         self.buffers.push(buffer);
-        BufferHandle(self.buffers.len() - 1)
+        BufferHandle::uniform(self.buffers.len() - 1)
     }
 
     fn create_index_buffer(&mut self, contents: &[u8]) -> BufferHandle {
@@ -199,11 +247,12 @@ impl Janderer for WGPURenderer {
             });
 
         self.buffers.push(buffer);
-        BufferHandle(self.buffers.len() - 1)
+        BufferHandle::uniform(self.buffers.len() - 1)
     }
 
     fn write_buffer(&mut self, buffer: BufferHandle, data: &[u8]) {
-        self.queue.write_buffer(&self.buffers[buffer.0], 0, data);
+        self.queue
+            .write_buffer(&self.buffers[buffer.index], 0, data);
     }
 
     fn new_pass(&mut self, window_handle: WindowHandle) -> RenderPass {
@@ -224,6 +273,10 @@ impl Janderer for WGPURenderer {
         WGPURenderPass::new(self, surface_view)
     }
 
+    fn new_compute_pass(&mut self) -> WGPUComputePass {
+        WGPUComputePass::new(self)
+    }
+
     fn create_shader_at(&mut self, desc: ShaderDescriptor, handle: ShaderHandle) {
         //ugly ass code fuck off
         let bind_group_layouts = Self::get_layouts(&self.device, &desc.bind_group_layouts);
@@ -238,11 +291,11 @@ impl Janderer for WGPURenderer {
             });
 
         let crate::shader::ShaderSource::Code(code) = &desc.source;
-
         let shader = wgpu::ShaderModuleDescriptor {
             label: Some("Shader"),
             source: wgpu::ShaderSource::Wgsl(code.clone().into()),
         };
+        let shader = self.device.create_shader_module(shader);
 
         let format = match desc.target_texture_format {
             TextureFormat::Rgba8U => wgpu::TextureFormat::Rgba8UnormSrgb,
@@ -263,7 +316,6 @@ impl Janderer for WGPURenderer {
             .collect::<Vec<_>>();
         let buffers = Self::get_buffer_layouts(&attributes, &desc.descriptors);
 
-        let shader = self.device.create_shader_module(shader);
         let pipeline = self
             .device
             .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -331,8 +383,7 @@ impl Janderer for WGPURenderer {
     }
 
     fn re_create_shader(&mut self, handle: ShaderHandle) {
-        let descriptor = &self.shader_descriptors[handle.0];
-        self.create_shader_at(descriptor.clone(), handle);
+        self.create_shader_at(self.shader_descriptors[handle.0].clone(), handle);
     }
 
     fn re_create_shaders(&mut self) {
@@ -489,7 +540,7 @@ impl Janderer for WGPURenderer {
     fn write_bind_group(&mut self, handle: UntypedBindGroupHandle, data: &[u8]) {
         let render_data = &self.bind_groups_render_data[handle.0];
         self.queue
-            .write_buffer(&self.buffers[render_data.buffer_handle.0], 0, data);
+            .write_buffer(&self.buffers[render_data.buffer_handle.index], 0, data);
     }
 
     fn create_bind_group_at(
@@ -500,7 +551,7 @@ impl Janderer for WGPURenderer {
         {
             let layout = bind_group.get_layout(self);
             let bind_group_layout = Self::get_layout(&self.device, &layout);
-            let mut first_handle = BufferHandle(0); // TODO FIX THIS LMAO
+            let mut first_handle = BufferHandle::uniform(0); // TODO FIX THIS LMAO
             let entries = layout
                 .entries
                 .iter()
@@ -510,7 +561,7 @@ impl Janderer for WGPURenderer {
                     resource: match entry {
                         BindGroupLayoutEntry::Data(handle) => {
                             first_handle = *handle;
-                            self.buffers[handle.0].as_entire_binding()
+                            self.buffers[first_handle.index].as_entire_binding()
                         }
                         BindGroupLayoutEntry::Texture(handle) => {
                             wgpu::BindingResource::TextureView(&self.textures[handle.0].view)
@@ -595,5 +646,68 @@ impl Janderer for WGPURenderer {
                 e.present()
             }
         });
+    }
+
+    fn create_compute_shader_at(
+        &mut self,
+        desc: crate::shader::ComputeShaderDescriptor,
+        handle: ComputeShaderHandle,
+    ) {
+        let crate::shader::ShaderSource::Code(code) = &desc.source;
+
+        let shader_desc = wgpu::ShaderModuleDescriptor {
+            label: Some("Shader"),
+            source: wgpu::ShaderSource::Wgsl(code.clone().into()),
+        };
+        let shader = self.device.create_shader_module(shader_desc);
+
+        //ugly ass code fuck off
+        let bind_group_layouts = Self::get_layouts(&self.device, &desc.bind_group_layouts);
+        let bind_group_ref = bind_group_layouts.iter().collect::<Vec<_>>();
+
+        let layout = self
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: None,
+                bind_group_layouts: &bind_group_ref,
+                push_constant_ranges: &[],
+            });
+
+        let pipeline = self
+            .device
+            .create_compute_pipeline(&ComputePipelineDescriptor {
+                label: Some("Compute Pipeline"),
+                layout: Some(&layout),
+                module: &shader,
+                entry_point: desc.entry,
+            });
+
+        let shader = WGPUComputeShader { pipeline };
+
+        if handle.0 >= self.compute_shaders.len() {
+            self.compute_shaders.push(shader);
+            self.compute_shader_descriptors.push(desc);
+        } else {
+            self.compute_shaders[handle.0] = shader;
+        }
+    }
+
+    fn create_compute_shader(
+        &mut self,
+        desc: crate::shader::ComputeShaderDescriptor,
+    ) -> ComputeShaderHandle {
+        self.create_compute_shader_at(desc, ComputeShaderHandle(self.compute_shaders.len()));
+        ComputeShaderHandle(self.compute_shaders.len() - 1)
+    }
+
+    fn re_create_compute_shader(&mut self, handle: ComputeShaderHandle) {
+        let descriptor = &self.compute_shader_descriptors[handle.0];
+        self.create_compute_shader_at(descriptor.clone(), handle);
+    }
+
+    fn re_create_compute_shaders(&mut self) {
+        for i in 0..self.compute_shaders.len() {
+            self.re_create_compute_shader(ComputeShaderHandle(i));
+        }
     }
 }

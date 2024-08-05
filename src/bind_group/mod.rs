@@ -1,6 +1,8 @@
 use std::any::Any;
 
-use super::renderer::{BufferHandle, Renderer, SamplerHandle, TextureHandle};
+use crate::renderer::BufferHandle;
+
+use super::renderer::{Renderer, SamplerHandle, TextureHandle};
 
 pub mod camera;
 pub mod resolution;

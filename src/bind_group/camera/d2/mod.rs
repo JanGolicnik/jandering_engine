@@ -161,7 +161,7 @@ impl D2CameraBindGroup {
 
     pub fn get_layout() -> BindGroupLayout {
         BindGroupLayout {
-            entries: vec![BindGroupLayoutEntry::Data(BufferHandle(0))],
+            entries: vec![BindGroupLayoutEntry::Data(BufferHandle::uniform(0))],
         }
     }
 }

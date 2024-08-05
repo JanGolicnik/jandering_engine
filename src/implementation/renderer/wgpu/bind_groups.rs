@@ -14,19 +14,34 @@ impl WGPURenderer {
             .entries
             .iter()
             .map(|e| match e {
-                BindGroupLayoutEntry::Data(_) => wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
+                BindGroupLayoutEntry::Data(handle) => {
+                    let ty = wgpu::BindingType::Buffer {
+                        ty: match handle.buffer_type {
+                            crate::renderer::BufferType::Uniform => {
+                                wgpu::BufferBindingType::Uniform
+                            }
+                            crate::renderer::BufferType::Storage => {
+                                wgpu::BufferBindingType::Storage { read_only: false }
+                            }
+                        },
                         has_dynamic_offset: false,
                         min_binding_size: None,
-                    },
-                    count: None,
-                },
+                    };
+
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::COMPUTE
+                            | wgpu::ShaderStages::VERTEX
+                            | wgpu::ShaderStages::FRAGMENT,
+                        ty,
+                        count: None,
+                    }
+                }
                 BindGroupLayoutEntry::Texture(_) => wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                    visibility: wgpu::ShaderStages::COMPUTE
+                        | wgpu::ShaderStages::VERTEX
+                        | wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Texture {
                         sample_type: wgpu::TextureSampleType::Float { filterable: true },
                         view_dimension: wgpu::TextureViewDimension::D2,
@@ -36,7 +51,9 @@ impl WGPURenderer {
                 },
                 BindGroupLayoutEntry::Sampler(_) => wgpu::BindGroupLayoutEntry {
                     binding: 1,
-                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                    visibility: wgpu::ShaderStages::COMPUTE
+                        | wgpu::ShaderStages::VERTEX
+                        | wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },

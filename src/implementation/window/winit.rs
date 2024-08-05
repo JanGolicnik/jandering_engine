@@ -151,6 +151,7 @@ impl WinitWindowManager {
             config,
             events: Events::default(),
             last_redraw_time: web_time::Instant::now(),
+            should_close: false,
         };
         self.ids_to_handles.insert(window.window.id(), handle);
         self.windows.insert(handle, window);
@@ -263,7 +264,13 @@ impl ApplicationHandler<EngineEvent> for WinitWindowManager {
             return;
         }
 
+        self.windows.retain(|_, window| !window.should_close);
+
         self.create_queued_windows(event_loop);
+
+        if self.windows.is_empty() {
+            event_loop.exit();
+        }
     }
 }
 
@@ -273,6 +280,7 @@ pub struct WinitWindow {
     config: WindowConfig,
     pub(crate) events: Events,
     last_redraw_time: std::time::Instant,
+    should_close: bool,
 }
 
 impl WinitWindow {
@@ -327,7 +335,7 @@ impl WindowTrait for WinitWindow {
     }
 
     fn close(&mut self) {
-        todo!();
+        self.should_close = true;
     }
 
     fn set_cursor_visible(&mut self, val: bool) {

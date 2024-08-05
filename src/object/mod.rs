@@ -1,9 +1,14 @@
-use crate::{renderer::Janderer, shader::BufferLayoutEntryDataType, types::*, utils::load_obj};
+use crate::{
+    renderer::{BufferHandle, Janderer},
+    shader::BufferLayoutEntryDataType,
+    types::*,
+    utils::load_obj,
+};
 
 use self::primitives::{quad_data, triangle_data};
 
 use super::{
-    renderer::{BufferHandle, Renderer},
+    renderer::Renderer,
     shader::{BufferLayout, BufferLayoutEntry},
 };
 

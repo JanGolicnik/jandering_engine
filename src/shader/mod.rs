@@ -49,7 +49,7 @@ pub struct BufferLayout {
 #[derive(Clone)]
 pub struct ShaderDescriptor {
     pub source: ShaderSource,
-    pub descriptors: Vec<BufferLayout>, //TODO: abstract this away so there is no dependency on wgpu
+    pub descriptors: Vec<BufferLayout>,
     pub bind_group_layouts: Vec<BindGroupLayout>,
     pub vs_entry: &'static str,
     pub fs_entry: &'static str,
@@ -58,6 +58,13 @@ pub struct ShaderDescriptor {
     pub stripped: bool,
     pub multisample: u32,
     pub target_texture_format: TextureFormat,
+}
+
+#[derive(Clone)]
+pub struct ComputeShaderDescriptor {
+    pub source: ShaderSource,
+    pub bind_group_layouts: Vec<BindGroupLayout>,
+    pub entry: &'static str,
 }
 
 impl Default for ShaderDescriptor {

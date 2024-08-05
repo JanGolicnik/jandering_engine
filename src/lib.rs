@@ -1,4 +1,5 @@
 pub mod bind_group;
+pub mod compute_pass;
 pub mod engine;
 pub mod event_handler;
 pub mod implementation;

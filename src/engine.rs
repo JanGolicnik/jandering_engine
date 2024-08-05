@@ -17,8 +17,26 @@ pub struct Engine<T: EventHandler> {
 }
 
 impl<T: EventHandler + 'static> Engine<T> {
-    pub async fn new() -> Self {
-        let renderer = Renderer::new().await;
+    pub async fn default() -> Self {
+        Self::new(EngineConfig::default()).await
+    }
+}
+
+pub struct EngineConfig {
+    pub enable_compute: bool,
+}
+
+impl Default for EngineConfig {
+    fn default() -> Self {
+        Self {
+            enable_compute: false,
+        }
+    }
+}
+
+impl<T: EventHandler + 'static> Engine<T> {
+    pub async fn new(config: EngineConfig) -> Self {
+        let renderer = Renderer::new(config).await;
         let window_manager = WindowManager::new();
 
         Self {

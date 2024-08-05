@@ -122,13 +122,18 @@ impl<'renderer> RenderPassTrait for WGPURenderPass<'renderer> {
 
         let (vertex_buffer_handle, index_buffer_handle, instance_buffer) = renderable.get_buffers();
 
-        render_pass.set_vertex_buffer(0, self.renderer.buffers[vertex_buffer_handle.0].slice(..));
+        render_pass.set_vertex_buffer(
+            0,
+            self.renderer.buffers[vertex_buffer_handle.index].slice(..),
+        );
         if let Some(instance_buffer_handle) = instance_buffer {
-            render_pass
-                .set_vertex_buffer(1, self.renderer.buffers[instance_buffer_handle.0].slice(..));
+            render_pass.set_vertex_buffer(
+                1,
+                self.renderer.buffers[instance_buffer_handle.index].slice(..),
+            );
         }
         render_pass.set_index_buffer(
-            self.renderer.buffers[index_buffer_handle.0].slice(..),
+            self.renderer.buffers[index_buffer_handle.index].slice(..),
             wgpu::IndexFormat::Uint32,
         );
 
