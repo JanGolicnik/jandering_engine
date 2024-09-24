@@ -22,16 +22,9 @@ impl<T: EventHandler + 'static> Engine<T> {
     }
 }
 
+#[derive(Default)]
 pub struct EngineConfig {
     pub enable_compute: bool,
-}
-
-impl Default for EngineConfig {
-    fn default() -> Self {
-        Self {
-            enable_compute: false,
-        }
-    }
 }
 
 impl<T: EventHandler + 'static> Engine<T> {

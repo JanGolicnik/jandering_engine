@@ -6,7 +6,6 @@ use jandering_engine::{
     engine::{Engine, EngineContext},
     event_handler::EventHandler,
     object::{Instance, Object, Vertex},
-    render_pass::RenderPassTrait,
     renderer::{BindGroupHandle, Janderer, Renderer, ShaderHandle, TextureHandle},
     shader::ShaderDescriptor,
     texture::{TextureDescriptor, TextureFormat},
@@ -48,17 +47,18 @@ impl Application {
         let renderer = &mut engine.renderer;
 
         let controller: Box<dyn CameraController> = Box::<FreeCameraController>::default();
-        let mut camera = MatrixCameraBindGroup::with_controller(controller);
+        let mut camera = MatrixCameraBindGroup::with_controller(renderer, controller);
         camera.make_perspective(CAMERA_FOV, 1.0, CAMEREA_NEAR, CAMEREA_FAR);
-        let camera = renderer.create_typed_bind_group(camera);
 
         let shader = renderer.create_shader(
             ShaderDescriptor::default()
                 .with_descriptors(vec![Vertex::desc(), Instance::desc()])
-                .with_bind_group_layouts(vec![MatrixCameraBindGroup::get_layout()])
+                .with_bind_group_layouts(vec![camera.get_layout()])
                 .with_depth(true)
                 .with_backface_culling(false),
         );
+
+        let camera = renderer.create_typed_bind_group(camera);
 
         let cube = Object::from_obj(
             include_str!("cube.obj"),
@@ -167,18 +167,17 @@ impl EventHandler for Application {
         let data = camera.get_data();
         renderer.write_bind_group(self.camera.into(), &data);
 
-        renderer
-            .new_pass(self.window_handle)
-            .with_depth(self.depth_texture, Some(1.0))
+        let mut pass = renderer.new_pass(self.window_handle);
+        pass.with_depth(self.depth_texture, Some(1.0))
             .with_alpha(0.0)
             .set_shader(self.shader)
             .bind(0, self.camera.into())
-            .render(&[&self.cube])
-            .submit();
+            .render(&[&self.cube]);
+        pass.submit();
     }
 }
 fn main() {
-    let mut engine = pollster::block_on(Engine::new());
+    let mut engine = pollster::block_on(Engine::default());
 
     let app = Application::new(&mut engine);
 

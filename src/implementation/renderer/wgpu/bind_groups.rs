@@ -37,24 +37,38 @@ impl WGPURenderer {
                         count: None,
                     }
                 }
-                BindGroupLayoutEntry::Texture(_) => wgpu::BindGroupLayoutEntry {
+                BindGroupLayoutEntry::Texture { depth, .. } => wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::COMPUTE
                         | wgpu::ShaderStages::VERTEX
                         | wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        sample_type: if *depth {
+                            wgpu::TextureSampleType::Depth
+                        } else {
+                            wgpu::TextureSampleType::Float { filterable: true }
+                        },
                         view_dimension: wgpu::TextureViewDimension::D2,
                         multisampled: false,
                     },
                     count: None,
                 },
-                BindGroupLayoutEntry::Sampler(_) => wgpu::BindGroupLayoutEntry {
+                BindGroupLayoutEntry::Sampler { sampler_type, .. } => wgpu::BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStages::COMPUTE
                         | wgpu::ShaderStages::VERTEX
                         | wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    ty: wgpu::BindingType::Sampler(match sampler_type {
+                        crate::bind_group::SamplerType::Filtering => {
+                            wgpu::SamplerBindingType::Filtering
+                        }
+                        crate::bind_group::SamplerType::NonFiltering => {
+                            wgpu::SamplerBindingType::NonFiltering
+                        }
+                        crate::bind_group::SamplerType::Comparison => {
+                            wgpu::SamplerBindingType::Comparison
+                        }
+                    }),
                     count: None,
                 },
             })

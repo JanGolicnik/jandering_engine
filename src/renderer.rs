@@ -1,8 +1,7 @@
 use crate::{
     engine::EngineConfig,
-    implementation::renderer::wgpu::{
-        compute_pass::WGPUComputePass, render_pass::WGPURenderPass, WGPURenderer,
-    },
+    implementation::renderer::wgpu::{compute_pass::WGPUComputePass, WGPURenderer},
+    render_pass::RenderPass,
     shader::ComputeShaderDescriptor,
     window::{WindowHandle, WindowManager},
 };
@@ -41,27 +40,26 @@ impl BufferHandle {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct TextureHandle(pub usize);
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct SamplerHandle(pub usize);
 
 pub struct BindGroupHandle<T>(pub usize, pub std::marker::PhantomData<T>);
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct UntypedBindGroupHandle(pub usize);
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ShaderHandle(pub usize);
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ComputeShaderHandle(pub usize);
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "wgpu")] {
         pub type Renderer = WGPURenderer;
-        pub type RenderPass<'renderer> = WGPURenderPass<'renderer>;
         pub type ComputePass<'renderer> = WGPUComputePass<'renderer>;
     }
     // else if #[cfg(feature="nekinovga")] {

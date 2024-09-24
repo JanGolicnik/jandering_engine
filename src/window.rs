@@ -90,7 +90,7 @@ unsafe impl raw_window_handle::HasRawDisplayHandle for Window {
 }
 
 // Adapted (taken 😈) from winit
-#[derive(Copy, Debug, Clone, PartialEq)]
+#[derive(Copy, Debug, Clone, PartialEq, Hash, Eq)]
 pub enum Key {
     Key1,
     Key2,

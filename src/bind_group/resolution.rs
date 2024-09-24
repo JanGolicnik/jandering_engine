@@ -1,5 +1,5 @@
 use crate::{
-    renderer::{Janderer, Renderer},
+    renderer::{BufferHandle, Janderer, Renderer},
     types::UVec2,
 };
 
@@ -16,6 +16,7 @@ struct ResolutionBindGroupData {
 
 pub struct ResolutionBindGroup {
     data: ResolutionBindGroupData,
+    buffer_handle: BufferHandle,
 }
 
 impl BindGroup for ResolutionBindGroup {
@@ -23,22 +24,24 @@ impl BindGroup for ResolutionBindGroup {
         bytemuck::cast_slice(&[self.data]).into()
     }
 
-    fn get_layout(&self, renderer: &mut Renderer) -> BindGroupLayout {
-        let buffer_handle = renderer.create_uniform_buffer(&self.get_data());
+    fn get_layout(&self) -> BindGroupLayout {
         BindGroupLayout {
-            entries: vec![BindGroupLayoutEntry::Data(buffer_handle)],
+            entries: vec![BindGroupLayoutEntry::Data(self.buffer_handle)],
         }
     }
 }
 
 impl ResolutionBindGroup {
-    pub fn new(resolution: UVec2) -> Self {
+    pub fn new(renderer: &mut Renderer, resolution: UVec2) -> Self {
+        let data = ResolutionBindGroupData {
+            resolution: resolution.into(),
+            #[cfg(target_arch = "wasm32")]
+            padding: [0.0; 2],
+        };
+        let buffer_handle = renderer.create_uniform_buffer(bytemuck::cast_slice(&[data]));
         Self {
-            data: ResolutionBindGroupData {
-                resolution: resolution.into(),
-                #[cfg(target_arch = "wasm32")]
-                padding: [0.0; 2],
-            },
+            data,
+            buffer_handle,
         }
     }
 

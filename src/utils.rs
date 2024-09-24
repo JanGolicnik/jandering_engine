@@ -1,8 +1,8 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
     object::Vertex,
-    types::{UVec2, Vec2, Vec3},
+    types::{Vec2, Vec3},
 };
 
 pub const SQRT_3: f32 = 1.732_050_8;
@@ -119,21 +119,20 @@ pub fn load_obj(data: &str) -> (Vec<Vertex>, Vec<u32>) {
 
     let mut indices = Vec::new();
     let mut vertices = Vec::new();
-    let mut mapped_vertices: Vec<(UVec2, u32)> = Vec::new();
+    let mut vert_normal_to_index = HashMap::new();
     for group in groups {
-        let key = UVec2::new(group[0], group[1]);
-        if let Some(e) = mapped_vertices.iter().find(|e| e.0 == key) {
-            // TODO: optimize this
-            indices.push(e.1)
+        let key = (group[0], group[1], group[2]);
+        if let Some(e) = vert_normal_to_index.get(&key) {
+            indices.push(*e)
         } else {
             let index = vertices.len() as u32;
             indices.push(index);
             vertices.push(Vertex {
                 position: positions[group[0] as usize],
-                normal: normals[group[2] as usize],
                 uv: uvs[group[1] as usize],
+                normal: normals[group[2] as usize],
             });
-            mapped_vertices.push((key, index))
+            vert_normal_to_index.insert(key, index);
         }
     }
 

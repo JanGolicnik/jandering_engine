@@ -4,10 +4,9 @@ use jandering_engine::{
         camera::free::{CameraController, FreeCameraController, MatrixCameraBindGroup},
         BindGroup,
     },
-    engine::{Engine, EngineContext},
+    engine::{Engine, EngineConfig, EngineContext},
     event_handler::EventHandler,
     object::{Instance, Object, Vertex},
-    render_pass::RenderPassTrait,
     renderer::{BindGroupHandle, Janderer, Renderer, ShaderHandle, TextureHandle},
     shader::ShaderDescriptor,
     texture::{TextureDescriptor, TextureFormat},
@@ -54,22 +53,22 @@ impl Application {
         let renderer = &mut engine.renderer;
 
         let controller: Box<dyn CameraController> = Box::<FreeCameraController>::default();
-        let mut camera = MatrixCameraBindGroup::with_controller(controller);
+        let mut camera = MatrixCameraBindGroup::with_controller(renderer, controller);
         camera.make_perspective(
             CAMERA_FOV,
             resolution.0 as f32 / resolution.1 as f32,
             CAMEREA_NEAR,
             CAMEREA_FAR,
         );
-        let camera = renderer.create_typed_bind_group(camera);
-
         let shader = renderer.create_shader(
             ShaderDescriptor::default()
                 .with_descriptors(vec![Vertex::desc(), Instance::desc()])
-                .with_bind_group_layouts(vec![MatrixCameraBindGroup::get_layout()])
+                .with_bind_group_layouts(vec![camera.get_layout()])
                 .with_depth(true)
                 .with_backface_culling(false),
         );
+
+        let camera = renderer.create_typed_bind_group(camera);
 
         let mut rand = rand::thread_rng();
 
@@ -89,7 +88,7 @@ impl Application {
                 let angle = rand.gen::<f32>() * 360.0;
                 Instance::default()
                     .rotate(angle.to_radians(), axis)
-                    .set_size(Vec3::splat(1.0 + rand.gen::<f32>() * 10.0))
+                    .resize(Vec3::splat(1.0 + rand.gen::<f32>() * 10.0))
                     .translate(pos)
             })
             .collect::<Vec<_>>();
@@ -101,7 +100,7 @@ impl Application {
             renderer,
             vec![Instance::default()
                 .translate(Vec3::new(0.0, -5.0, 0.0))
-                .set_size(Vec3::splat(0.05))],
+                .resize(Vec3::splat(0.05))],
         );
 
         let depth_texture = renderer.create_texture(TextureDescriptor {
@@ -236,29 +235,27 @@ impl EventHandler for Application {
         let data = camera.get_data();
         renderer.write_bind_group(self.camera.into(), &data);
 
-        renderer
-            .new_pass(self.window_handle)
-            .with_depth(self.depth_texture, Some(1.0))
+        let mut pass = renderer.new_pass(self.window_handle);
+        pass.with_depth(self.depth_texture, Some(1.0))
             .with_clear_color(0.2, 0.5, 1.0)
             .set_shader(self.shader)
             .bind(0, self.camera.into())
-            .render(&[&self.ground, &self.susane])
-            .submit();
+            .render(&[&self.ground, &self.susane]);
+        pass.submit();
 
         for handle in self.extra_windows.iter() {
-            renderer
-                .new_pass(*handle)
-                .with_depth(self.depth_texture, Some(1.0))
+            let mut pass = renderer.new_pass(*handle);
+            pass.with_depth(self.depth_texture, Some(1.0))
                 .with_clear_color(0.2, 0.5, 1.0)
                 .set_shader(self.shader)
                 .bind(0, self.camera.into())
-                .render(&[&self.ground, &self.susane])
-                .submit();
+                .render(&[&self.ground, &self.susane]);
+            pass.submit();
         }
     }
 }
 fn main() {
-    let mut engine = pollster::block_on(Engine::new());
+    let mut engine = pollster::block_on(Engine::new(EngineConfig::default()));
 
     let app = Application::new(&mut engine);
 

@@ -2,7 +2,7 @@ use std::any::Any;
 
 use crate::renderer::BufferHandle;
 
-use super::renderer::{Renderer, SamplerHandle, TextureHandle};
+use super::renderer::{SamplerHandle, TextureHandle};
 
 pub mod camera;
 pub mod resolution;
@@ -10,7 +10,7 @@ pub mod texture;
 
 pub trait BindGroup: Any + BindGroupToAny {
     fn get_data(&self) -> Box<[u8]>;
-    fn get_layout(&self, renderer: &mut Renderer) -> BindGroupLayout;
+    fn get_layout(&self) -> BindGroupLayout;
 }
 
 pub trait BindGroupToAny {
@@ -31,11 +31,24 @@ impl<T: 'static> BindGroupToAny for T {
 #[derive(Clone)]
 pub enum BindGroupLayoutEntry {
     Data(BufferHandle),
-    Texture(TextureHandle),
-    Sampler(SamplerHandle),
+    Texture {
+        handle: TextureHandle,
+        depth: bool,
+    },
+    Sampler {
+        handle: SamplerHandle,
+        sampler_type: SamplerType,
+    },
 }
 
 #[derive(Clone)]
 pub struct BindGroupLayout {
     pub entries: Vec<BindGroupLayoutEntry>,
+}
+
+#[derive(Clone)]
+pub enum SamplerType {
+    Filtering,
+    NonFiltering,
+    Comparison,
 }

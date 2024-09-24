@@ -1,6 +1,6 @@
 use crate::renderer::{Renderer, SamplerHandle, TextureHandle};
 
-use super::{BindGroup, BindGroupLayout, BindGroupLayoutEntry};
+use super::{BindGroup, BindGroupLayout, BindGroupLayoutEntry, SamplerType};
 
 pub struct TextureBindGroup {
     pub texture_handle: TextureHandle,
@@ -12,11 +12,17 @@ impl BindGroup for TextureBindGroup {
         Box::new([])
     }
 
-    fn get_layout(&self, _renderer: &mut Renderer) -> BindGroupLayout {
+    fn get_layout(&self) -> BindGroupLayout {
         BindGroupLayout {
             entries: vec![
-                BindGroupLayoutEntry::Texture(self.texture_handle),
-                BindGroupLayoutEntry::Sampler(self.sampler_handle),
+                BindGroupLayoutEntry::Texture {
+                    handle: self.texture_handle,
+                    depth: false,
+                },
+                BindGroupLayoutEntry::Sampler {
+                    handle: self.sampler_handle,
+                    sampler_type: SamplerType::Filtering,
+                },
             ],
         }
     }
@@ -31,15 +37,6 @@ impl TextureBindGroup {
         Self {
             texture_handle,
             sampler_handle,
-        }
-    }
-
-    pub fn get_layout() -> BindGroupLayout {
-        BindGroupLayout {
-            entries: vec![
-                BindGroupLayoutEntry::Texture(TextureHandle(0)),
-                BindGroupLayoutEntry::Sampler(SamplerHandle(0)),
-            ],
         }
     }
 }

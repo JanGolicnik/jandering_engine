@@ -122,11 +122,17 @@ impl Instance {
         }
     }
 
-    pub fn set_position(mut self, pos: Vec3) -> Self {
+    pub fn from_mat(model: Mat4) -> Self {
+        Self {
+            model,
+            inv_model: model.inverse(),
+        }
+    }
+
+    pub fn set_position(&mut self, pos: Vec3) {
         let (scale, rotation, _) = self.model.to_scale_rotation_translation();
         self.model = Mat4::from_scale_rotation_translation(scale, rotation, pos);
         self.inv_model = self.model.inverse();
-        self
     }
 
     pub fn translate(mut self, pos: Vec3) -> Self {
@@ -134,6 +140,20 @@ impl Instance {
         self.model = Mat4::from_scale_rotation_translation(scale, rotation, translation + pos);
         self.inv_model = self.model.inverse();
         self
+    }
+
+    pub fn set_rotation(&mut self, angle_rad: f32, axis: Vec3) {
+        let (scale, rotation, translation) = self.model.to_scale_rotation_translation();
+        let new_rot = Qua::from_axis_angle(axis, angle_rad);
+        self.model = Mat4::from_scale_rotation_translation(scale, rotation * new_rot, translation);
+        self.inv_model = self.model.inverse();
+    }
+
+    pub fn look_in_dir(&mut self, dir: Vec3) {
+        let rotation = Qua::from_rotation_arc(Vec3::NEG_Z, dir.normalize());
+        let (scale, _, translation) = self.model.to_scale_rotation_translation();
+        self.model = Mat4::from_scale_rotation_translation(scale, rotation, translation);
+        self.inv_model = self.model.inverse();
     }
 
     pub fn rotate(&mut self, angle_rad: f32, axis: Vec3) -> &mut Self {
@@ -144,16 +164,22 @@ impl Instance {
         self
     }
 
-    pub fn resize(mut self, size: f32) -> Self {
+    pub fn set_size(&mut self, size: Vec3) {
+        let (_, rotation, translation) = self.model.to_scale_rotation_translation();
+        self.model = Mat4::from_scale_rotation_translation(size, rotation, translation);
+        self.inv_model = self.model.inverse();
+    }
+
+    pub fn scale(mut self, scalar: f32) -> Self {
         let (scale, rotation, translation) = self.model.to_scale_rotation_translation();
-        self.model = Mat4::from_scale_rotation_translation(scale + size, rotation, translation);
+        self.model = Mat4::from_scale_rotation_translation(scale * scalar, rotation, translation);
         self.inv_model = self.model.inverse();
         self
     }
 
-    pub fn set_size(mut self, size: Vec3) -> Self {
-        let (_, rotation, translation) = self.model.to_scale_rotation_translation();
-        self.model = Mat4::from_scale_rotation_translation(size, rotation, translation);
+    pub fn resize(mut self, size: Vec3) -> Self {
+        let (scale, rotation, translation) = self.model.to_scale_rotation_translation();
+        self.model = Mat4::from_scale_rotation_translation(scale * size, rotation, translation);
         self.inv_model = self.model.inverse();
         self
     }
@@ -268,35 +294,57 @@ impl Default for D2Instance {
 }
 
 impl D2Instance {
-    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
-        use std::mem;
-
-        wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<D2Instance>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Instance,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 5,
-                    format: wgpu::VertexFormat::Float32x2,
+    pub fn desc() -> BufferLayout {
+        BufferLayout {
+            step_mode: crate::shader::BufferLayoutStepMode::Instance,
+            entries: &[
+                BufferLayoutEntry {
+                    location: 3,
+                    data_type: BufferLayoutEntryDataType::Float32x2,
                 },
-                wgpu::VertexAttribute {
-                    offset: mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
-                    shader_location: 6,
-                    format: wgpu::VertexFormat::Float32x2,
+                BufferLayoutEntry {
+                    location: 4,
+                    data_type: BufferLayoutEntryDataType::Float32x2,
                 },
-                wgpu::VertexAttribute {
-                    offset: mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
-                    shader_location: 7,
-                    format: wgpu::VertexFormat::Float32,
+                BufferLayoutEntry {
+                    location: 5,
+                    data_type: BufferLayoutEntryDataType::Float32,
                 },
-                wgpu::VertexAttribute {
-                    offset: mem::size_of::<[f32; 5]>() as wgpu::BufferAddress,
-                    shader_location: 8,
-                    format: wgpu::VertexFormat::Float32x3,
+                BufferLayoutEntry {
+                    location: 6,
+                    data_type: BufferLayoutEntryDataType::Float32x3,
                 },
             ],
         }
+    }
+    pub fn set_color(mut self, color: Vec3) -> Self {
+        self.color = color;
+        self
+    }
+
+    pub fn set_position(mut self, pos: Vec2) -> Self {
+        self.position = pos;
+        self
+    }
+
+    pub fn translate(mut self, pos: Vec2) -> Self {
+        self.position += pos;
+        self
+    }
+
+    pub fn rotate(&mut self, angle_rad: f32) -> &mut Self {
+        self.rotation += angle_rad;
+        self
+    }
+
+    pub fn scale(mut self, size: f32) -> Self {
+        self.scale *= size;
+        self
+    }
+
+    pub fn set_size(mut self, size: Vec2) -> Self {
+        self.scale = size;
+        self
     }
 }
 

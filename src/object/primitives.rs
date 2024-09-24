@@ -31,28 +31,28 @@ pub fn triangle_data() -> (Vec<Vertex>, Vec<u32>) {
 pub fn quad_data() -> (Vec<Vertex>, Vec<u32>) {
     let vertices = vec![
         Vertex {
-            position: Vec3::new(-1.0, -1.0, 0.0),
-            uv: Vec2::new(0.0, 0.0),
+            position: Vec3::new(0.0, 0.0, 0.0),
+            uv: Vec2::new(0.0, 1.0),
             normal: Vec3::new(-1.0, -1.0, 1.0),
         },
         Vertex {
-            position: Vec3::new(1.0, 1.0, 0.0),
-            uv: Vec2::new(1.0, 1.0),
+            position: Vec3::new(0.0, 1.0, 0.0),
+            uv: Vec2::new(0.0, 0.0),
             normal: Vec3::new(1.0, 1.0, 1.0),
         },
         Vertex {
-            position: Vec3::new(1.0, -1.0, 0.0),
-            uv: Vec2::new(1.0, 0.0),
+            position: Vec3::new(1.0, 0.0, 0.0),
+            uv: Vec2::new(1.0, 1.0),
             normal: Vec3::new(1.0, -1.0, 1.0),
         },
         Vertex {
-            position: Vec3::new(-1.0, 1.0, 0.0),
-            uv: Vec2::new(0.0, 1.0),
+            position: Vec3::new(1.0, 1.0, 0.0),
+            uv: Vec2::new(1.0, 0.0),
             normal: Vec3::new(-1.0, 1.0, 1.0),
         },
     ];
 
-    let indices = vec![0, 2, 1, 0, 1, 3];
+    let indices = vec![0, 3, 2, 0, 1, 3];
 
     (vertices, indices)
 }

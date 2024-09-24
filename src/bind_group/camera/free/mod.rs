@@ -21,6 +21,7 @@ pub struct CameraData {
     direction: Vec3,
     direction_padding: f32,
     view_proj: Mat4,
+    inverse_view: Mat4,
 }
 
 pub struct FreeCameraController {
@@ -47,6 +48,7 @@ pub struct MatrixCameraBindGroup {
     data: CameraData,
     proj: Mat4,
     pub controller: Option<Box<dyn CameraController>>,
+    buffer_handle: BufferHandle,
 }
 
 impl BindGroup for MatrixCameraBindGroup {
@@ -54,16 +56,15 @@ impl BindGroup for MatrixCameraBindGroup {
         bytemuck::cast_slice(&[self.data]).into()
     }
 
-    fn get_layout(&self, renderer: &mut Renderer) -> BindGroupLayout {
-        let buffer_handle = renderer.create_uniform_buffer(&self.get_data());
+    fn get_layout(&self) -> BindGroupLayout {
         BindGroupLayout {
-            entries: vec![BindGroupLayoutEntry::Data(buffer_handle)],
+            entries: vec![BindGroupLayoutEntry::Data(self.buffer_handle)],
         }
     }
 }
 
-impl Default for MatrixCameraBindGroup {
-    fn default() -> Self {
+impl MatrixCameraBindGroup {
+    pub fn new(renderer: &mut Renderer) -> Self {
         let data = CameraData {
             up: Vec3::ZERO,
             up_padding: 0.0,
@@ -74,19 +75,21 @@ impl Default for MatrixCameraBindGroup {
             direction: -Vec3::Z,
             direction_padding: 0.0,
             view_proj: Mat4::IDENTITY,
+            inverse_view: Mat4::IDENTITY,
         };
 
+        let buffer_handle = renderer.create_uniform_buffer(bytemuck::cast_slice(&[data]));
+
         Self {
-            controller: None,
-            proj: Mat4::IDENTITY,
             data,
+            proj: Mat4::IDENTITY,
+            controller: None,
+            buffer_handle,
         }
     }
-}
 
-impl MatrixCameraBindGroup {
-    pub fn with_controller(controller: Box<dyn CameraController>) -> Self {
-        let mut this = Self::default();
+    pub fn with_controller(renderer: &mut Renderer, controller: Box<dyn CameraController>) -> Self {
+        let mut this = Self::new(renderer);
         this.attach_controller(controller);
         this
     }
@@ -115,14 +118,14 @@ impl MatrixCameraBindGroup {
         self.data.right = CAMERA_UP.cross(self.data.direction).normalize();
         self.data.up = self.data.direction.cross(self.data.right).normalize();
 
-        self.data.view_proj = {
-            let view = Mat4::look_at_rh(
-                self.data.position,
-                self.data.position + self.data.direction,
-                CAMERA_UP,
-            );
-            OPENGL_TO_WGPU_MATRIX * self.proj * view
-        };
+        let view = Mat4::look_at_rh(
+            self.data.position,
+            self.data.position + self.data.direction,
+            CAMERA_UP,
+        );
+
+        self.data.view_proj = OPENGL_TO_WGPU_MATRIX * self.proj * view;
+        self.data.inverse_view = view.inverse();
     }
 
     pub fn update(&mut self, events: &Events, dt: f32) {
@@ -138,13 +141,6 @@ impl MatrixCameraBindGroup {
 
         self.update_data()
     }
-
-    pub fn get_layout() -> BindGroupLayout {
-        BindGroupLayout {
-            entries: vec![BindGroupLayoutEntry::Data(BufferHandle::uniform(0))],
-        }
-    }
-
     pub fn attach_controller(&mut self, controller: Box<dyn CameraController>) -> &mut Self {
         self.controller = Some(controller);
         self
@@ -165,6 +161,12 @@ impl MatrixCameraBindGroup {
     }
     pub fn controller(&self) -> &Option<Box<dyn CameraController>> {
         &self.controller
+    }
+    pub fn up(&self) -> Vec3 {
+        self.data.up
+    }
+    pub fn right(&self) -> Vec3 {
+        self.data.right
     }
 }
 

@@ -1,15 +1,15 @@
 use std::{collections::HashMap, marker::PhantomData};
 
 use compute_pass::WGPUComputePass;
-use render_pass::WGPURenderPass;
 use wgpu::{util::DeviceExt, ComputePipelineDescriptor, Features, PresentMode, SurfaceTexture};
 
 use crate::{
     bind_group::{BindGroup, BindGroupLayoutEntry},
     engine::EngineConfig,
+    render_pass::{RenderPass, RenderStep},
     renderer::{
-        BindGroupHandle, BufferHandle, ComputeShaderHandle, Janderer, RenderPass, SamplerHandle,
-        ShaderHandle, TextureHandle, UntypedBindGroupHandle,
+        BindGroupHandle, BufferHandle, ComputeShaderHandle, Janderer, SamplerHandle, ShaderHandle,
+        TextureHandle, UntypedBindGroupHandle,
     },
     shader::{ComputeShaderDescriptor, ShaderDescriptor},
     texture::{
@@ -23,7 +23,6 @@ use crate::{
 
 mod bind_groups;
 pub mod compute_pass;
-pub mod render_pass;
 
 struct WGPUBindGroupRenderData {
     pub bind_group: wgpu::BindGroup,
@@ -38,6 +37,7 @@ pub struct WGPUComputeShader {
     pub pipeline: wgpu::ComputePipeline,
 }
 
+#[derive(Debug)]
 pub(crate) struct Surface {
     surface: wgpu::Surface,
     config: wgpu::SurfaceConfiguration,
@@ -256,21 +256,7 @@ impl Janderer for WGPURenderer {
     }
 
     fn new_pass(&mut self, window_handle: WindowHandle) -> RenderPass {
-        let surface = self.surfaces.get_mut(&window_handle).unwrap();
-        let surface_texture = match surface.surface.get_current_texture() {
-            Ok(surface) => surface,
-            Err(e) => {
-                panic!("{e}");
-            }
-        };
-
-        let surface_view = surface_texture
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-
-        surface.surface_texture = Some(surface_texture);
-
-        WGPURenderPass::new(self, surface_view)
+        RenderPass::new(self, window_handle)
     }
 
     fn new_compute_pass(&mut self) -> WGPUComputePass {
@@ -300,7 +286,9 @@ impl Janderer for WGPURenderer {
         let format = match desc.target_texture_format {
             TextureFormat::Rgba8U => wgpu::TextureFormat::Rgba8UnormSrgb,
             TextureFormat::Bgra8U => wgpu::TextureFormat::Bgra8UnormSrgb,
+            TextureFormat::F32 => wgpu::TextureFormat::R32Float,
             TextureFormat::Depth32F => wgpu::TextureFormat::Depth32Float,
+            TextureFormat::Depth16U => wgpu::TextureFormat::Depth16Unorm,
         };
 
         let targets = &[Some(wgpu::ColorTargetState {
@@ -402,7 +390,9 @@ impl Janderer for WGPURenderer {
         let (format, channels) = match desc.format {
             TextureFormat::Rgba8U => (wgpu::TextureFormat::Rgba8UnormSrgb, 4),
             TextureFormat::Bgra8U => (wgpu::TextureFormat::Bgra8UnormSrgb, 4),
+            TextureFormat::F32 => (wgpu::TextureFormat::R32Float, 1),
             TextureFormat::Depth32F => (wgpu::TextureFormat::Depth32Float, 1),
+            TextureFormat::Depth16U => (wgpu::TextureFormat::Depth16Unorm, 1),
         };
 
         let mut usage = wgpu::TextureUsages::empty();
@@ -420,15 +410,13 @@ impl Janderer for WGPURenderer {
         }
 
         let texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("texture"),
+            label: Some(desc.name),
             size,
             mip_level_count: 1,
             sample_count: desc.sample_count,
             dimension: wgpu::TextureDimension::D2,
             format,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                | wgpu::TextureUsages::TEXTURE_BINDING
-                | wgpu::TextureUsages::COPY_DST,
+            usage,
             view_formats: &[],
         });
 
@@ -458,7 +446,6 @@ impl Janderer for WGPURenderer {
             width: desc.size.x,
             height: desc.size.y,
         };
-
         if handle.0 >= self.textures.len() {
             self.textures.push(texture);
         } else {
@@ -549,7 +536,7 @@ impl Janderer for WGPURenderer {
         handle: UntypedBindGroupHandle,
     ) {
         {
-            let layout = bind_group.get_layout(self);
+            let layout = bind_group.get_layout();
             let bind_group_layout = Self::get_layout(&self.device, &layout);
             let mut first_handle = BufferHandle::uniform(0); // TODO FIX THIS LMAO
             let entries = layout
@@ -563,10 +550,10 @@ impl Janderer for WGPURenderer {
                             first_handle = *handle;
                             self.buffers[first_handle.index].as_entire_binding()
                         }
-                        BindGroupLayoutEntry::Texture(handle) => {
+                        BindGroupLayoutEntry::Texture { handle, .. } => {
                             wgpu::BindingResource::TextureView(&self.textures[handle.0].view)
                         }
-                        BindGroupLayoutEntry::Sampler(handle) => {
+                        BindGroupLayoutEntry::Sampler { handle, .. } => {
                             wgpu::BindingResource::Sampler(&self.samplers[handle.0])
                         }
                     },
@@ -641,8 +628,8 @@ impl Janderer for WGPURenderer {
     }
 
     fn present(&mut self) {
-        self.surfaces.iter_mut().for_each(|e| {
-            if let Some(e) = e.1.surface_texture.take() {
+        self.surfaces.iter_mut().for_each(|(_, surface)| {
+            if let Some(e) = surface.surface_texture.take() {
                 e.present()
             }
         });
@@ -708,6 +695,173 @@ impl Janderer for WGPURenderer {
     fn re_create_compute_shaders(&mut self) {
         for i in 0..self.compute_shaders.len() {
             self.re_create_compute_shader(ComputeShaderHandle(i));
+        }
+    }
+}
+
+impl WGPURenderer {
+    pub fn submit_pass(pass: RenderPass) {
+        let RenderPass {
+            renderer,
+            window_handle,
+            steps,
+        } = pass;
+
+        let mut encoder = renderer
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
+            });
+
+        let surface_texture_view = {
+            let surface = renderer.surfaces.get_mut(&window_handle).unwrap();
+
+            let surface_texture = if let Some(surface_texture) = &surface.surface_texture {
+                surface_texture
+            } else {
+                let surface_texture = match surface.surface.get_current_texture() {
+                    Ok(surface) => surface,
+                    Err(e) => {
+                        panic!("{e}");
+                    }
+                };
+                surface.surface_texture = Some(surface_texture);
+                surface.surface_texture.as_ref().unwrap()
+            };
+
+            surface_texture
+                .texture
+                .create_view(&wgpu::TextureViewDescriptor::default())
+        };
+
+        let mut render_pass = None;
+        let previous_target = None;
+
+        let len = steps.len() - 1;
+        for (i, step) in steps.iter().enumerate().take(len) {
+            let RenderStep {
+                action,
+                shader,
+                bind_groups,
+                target,
+                depth_tex,
+                resolve_target,
+                alpha,
+                depth,
+                clear_color,
+            } = step;
+
+            let mut changed = render_pass.is_none() || previous_target != *target;
+
+            if i > 0 {
+                if let Some(prev) = steps.get(i - 1) {
+                    changed |= *depth_tex != prev.depth_tex;
+                }
+            }
+
+            if changed {
+                drop(render_pass);
+
+                let (view, resolve_target) = if let Some(tex) = target {
+                    let view = &renderer.textures[tex.0].view;
+                    let resolve_target = Some(
+                        resolve_target
+                            .map(|tex| &renderer.textures[tex.0].view)
+                            .unwrap_or(&surface_texture_view),
+                    );
+                    (view, resolve_target)
+                } else {
+                    (&surface_texture_view, None)
+                };
+
+                let depth_stencil_attachment =
+                    depth_tex.map(|tex| wgpu::RenderPassDepthStencilAttachment {
+                        view: &renderer.textures[tex.0].view,
+                        depth_ops: Some(wgpu::Operations {
+                            load: if let Some(depth) = depth {
+                                wgpu::LoadOp::Clear(*depth)
+                            } else {
+                                wgpu::LoadOp::Load
+                            },
+                            store: wgpu::StoreOp::Store,
+                        }),
+                        stencil_ops: None,
+                    });
+
+                let new_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("Render Pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view,
+                        resolve_target,
+                        ops: wgpu::Operations {
+                            load: if let Some(color) = clear_color {
+                                wgpu::LoadOp::Clear(wgpu::Color {
+                                    r: color.x as f64 * *alpha as f64,
+                                    g: color.y as f64 * *alpha as f64,
+                                    b: color.z as f64 * *alpha as f64,
+                                    a: *alpha as f64,
+                                })
+                            } else {
+                                wgpu::LoadOp::Load
+                            },
+                            ..Default::default()
+                        },
+                    })],
+                    depth_stencil_attachment,
+                    occlusion_query_set: None,
+                    timestamp_writes: None,
+                });
+
+                render_pass = Some(new_pass);
+            }
+
+            let render_pass = render_pass.as_mut().unwrap();
+
+            if let Some(shader) = shader {
+                let shader = renderer.shaders.get(shader.0).unwrap();
+                render_pass.set_pipeline(&shader.pipeline);
+            }
+
+            for (index, handle) in bind_groups.iter() {
+                render_pass.set_bind_group(
+                    *index,
+                    &renderer.bind_groups_render_data[handle.0].bind_group,
+                    &[],
+                );
+            }
+
+            match action {
+                crate::render_pass::RenderAction::Mesh {
+                    vertex_buffer_handle,
+                    index_buffer_handle,
+                    instance_buffer_handle,
+                    range,
+                    num_indices,
+                } => {
+                    render_pass.set_vertex_buffer(
+                        0,
+                        renderer.buffers[vertex_buffer_handle.index].slice(..),
+                    );
+                    if let Some(instance_buffer_handle) = instance_buffer_handle {
+                        render_pass.set_vertex_buffer(
+                            1,
+                            renderer.buffers[instance_buffer_handle.index].slice(..),
+                        );
+                    }
+                    render_pass.set_index_buffer(
+                        renderer.buffers[index_buffer_handle.index].slice(..),
+                        wgpu::IndexFormat::Uint32,
+                    );
+
+                    render_pass.draw_indexed(0..*num_indices, 0, range.clone());
+                }
+                crate::render_pass::RenderAction::Empty => {}
+            }
+        }
+
+        if render_pass.is_some() {
+            drop(render_pass);
+            renderer.queue.submit(std::iter::once(encoder.finish()));
         }
     }
 }

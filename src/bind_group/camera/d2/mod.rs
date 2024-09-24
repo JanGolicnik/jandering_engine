@@ -36,6 +36,8 @@ pub struct D2CameraBindGroup {
     pressing: bool,
     mouse_is_inside: bool,
     pub right_click_move: bool,
+
+    buffer_handle: BufferHandle,
 }
 
 impl BindGroup for D2CameraBindGroup {
@@ -43,10 +45,9 @@ impl BindGroup for D2CameraBindGroup {
         bytemuck::cast_slice(&[self.data]).into()
     }
 
-    fn get_layout(&self, renderer: &mut Renderer) -> BindGroupLayout {
-        let buffer_handle = renderer.create_uniform_buffer(&self.get_data());
+    fn get_layout(&self) -> BindGroupLayout {
         BindGroupLayout {
-            entries: vec![BindGroupLayoutEntry::Data(buffer_handle)],
+            entries: vec![BindGroupLayoutEntry::Data(self.buffer_handle)],
         }
     }
 }
@@ -66,7 +67,7 @@ impl D2CameraBindGroup {
         self.data.resolution = self.resolution * zoom;
     }
 
-    pub fn new(resolution: UVec2, with_controller: bool) -> Self {
+    pub fn new(renderer: &mut Renderer, resolution: UVec2, with_controller: bool) -> Self {
         let data = D2CameraData {
             position: Vec2::ZERO,
             resolution: Vec2::new(resolution.x as f32, resolution.y as f32),
@@ -78,6 +79,8 @@ impl D2CameraBindGroup {
             None
         };
 
+        let buffer_handle = renderer.create_uniform_buffer(bytemuck::cast_slice(&[data]));
+
         Self {
             position: data.position,
             resolution: data.resolution,
@@ -88,6 +91,8 @@ impl D2CameraBindGroup {
             pressing: false,
             mouse_is_inside: false,
             right_click_move: false,
+
+            buffer_handle,
         }
     }
 

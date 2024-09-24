@@ -2,6 +2,7 @@ use crate::types::UVec2;
 
 pub mod sampler;
 
+#[derive(Debug)]
 pub struct Texture {
     pub texture: wgpu::Texture,
     pub(crate) view: wgpu::TextureView,
@@ -13,7 +14,9 @@ pub struct Texture {
 pub enum TextureFormat {
     Rgba8U,
     Bgra8U,
+    F32,
     Depth32F,
+    Depth16U,
 }
 
 pub mod texture_usage {
@@ -30,6 +33,7 @@ pub mod texture_usage {
 
 #[derive(Clone)]
 pub struct TextureDescriptor<'data> {
+    pub name: &'static str,
     pub size: UVec2,
     pub sample_count: u32,
     pub data: Option<&'data [u8]>,
@@ -40,6 +44,7 @@ pub struct TextureDescriptor<'data> {
 impl<'data> Default for TextureDescriptor<'data> {
     fn default() -> Self {
         Self {
+            name: "texture",
             size: UVec2::new(0, 0),
             sample_count: 1,
             format: TextureFormat::Bgra8U,
