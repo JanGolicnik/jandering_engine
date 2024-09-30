@@ -1,0 +1,20 @@
+[package]
+name = "better_winit_wasm_test"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+console_log = "1.0.0"
+log = "0.4.22"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4.43"
+web-time = "1.1.0"
+
+[dependencies.je_windowing]
+path="../../je_windowing"
+
+[dependencies.jandering_engine]
+path="../../jandering_engine"

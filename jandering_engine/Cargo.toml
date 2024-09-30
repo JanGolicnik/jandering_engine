@@ -1,0 +1,47 @@
+[package]
+name = "jandering_engine"
+version = "0.2.0"
+edition = "2021"
+authors = ["Jan Goličnik <jan@nejka.net>"]
+description = "Bare bones rendering framework"
+keywords = ["rendering"]
+license = "MPL-2.0"
+repository = "https://github.com/JanGolicnik/jandering_engine"
+rust-version = "1.65"
+exclude = [
+    "examples/*",
+]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["wgpu"]
+wgpu = []
+
+[dependencies]
+bytemuck = { version = "1.14.0", features = ["derive"] }
+log = "0.4.0"
+pollster = "0.3.0"
+cfg-if = "1.0.0"
+web-time = "1.0.0"
+image = { version = "0.24.8", features = ["png", "jpeg"], default-features = false }
+reqwest = "0.11.24"
+anyhow = "1.0.79"
+glam = { version = "0.25.0", features = ["bytemuck"]}
+wgpu = "22.1.0"
+je_windowing = { path = "../je_windowing" }
+
+[dependencies.windows]
+version = "0.57"
+features = ["Win32_Foundation", "Win32_Security", "Win32_System_Threading", "Win32_UI_WindowsAndMessaging"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures = "0.4.42"
+web-sys = { version = "0.3.0", features = [
+    "Document",
+    "Window",
+    "Element",
+    "Location",
+    "Screen",
+]}
