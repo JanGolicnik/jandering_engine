@@ -3,5 +3,5 @@ members = [
     "jandering_engine",
     "je_windowing"
 ]
-exclude = ["lib/better_winit_wasm_test"]
+exclude = ["lib/wasm_test"]
 resolver = "2"

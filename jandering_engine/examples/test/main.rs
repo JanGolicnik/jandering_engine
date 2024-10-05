@@ -50,7 +50,7 @@ fn main() {
 
     let camera_handle = renderer.create_typed_bind_group(camera);
 
-    const COUNT:i32 = 20;
+    const COUNT:i32 = 1;
     let mut cube_instance_grid = Vec::new();
     for x in -COUNT..=COUNT{
         for y in -COUNT..=COUNT{
@@ -144,90 +144,4 @@ fn main() {
 
         window.request_redraw();
     });
-
-
-    // let renderer = &mut engine.renderer;
-
-    // let controller: Box<dyn CameraController> = Box::<FreeCameraController>::default();
-    // let mut camera = MatrixCameraBindGroup::with_controller(renderer, controller);
-    // camera.make_perspective(CAMERA_FOV, 1.0, CAMEREA_NEAR, CAMEREA_FAR);
-
-    // let shader = renderer.create_shader(
-    //     ShaderDescriptor::default()
-    //         .with_descriptors(vec![Vertex::desc(), Instance::desc()])
-    //         .with_bind_group_layouts(vec![camera.get_layout()])
-    //         .with_depth(true)
-    //         .with_backface_culling(false),
-    // );
-
-    // let camera_handle = renderer.create_typed_bind_group(camera);
-
-    // let mut cube = Object::from_obj(
-    //     include_str!("cube.obj"),
-    //     renderer,
-    //     vec![Instance::default()],
-    // );
-
-    // let depth_texture = renderer.create_texture(TextureDescriptor {
-    //     size: UVec2::splat(resolution),
-    //     format: TextureFormat::Depth32F,
-    //     ..Default::default()
-    // });
-
-    // let mut last_time = web_time::Instant::now();
-    // while !window.should_close() {
-    //     pollster::block_on(window.poll_events()); // waits for vsync
-
-    //     // UPDATE
-    //     let current_time = web_time::Instant::now();
-    //     let dt = (current_time - last_time).as_secs_f32();
-    //     last_time = current_time;
-
-    //     if window
-    //         .events()
-    //         .iter()
-    //         .any(|e| matches!(e, WindowEvent::Resized(_)))
-    //     {
-    //         let resolution = window.size();
-
-    //         let camera = renderer.get_typed_bind_group_mut(camera_handle).unwrap();
-    //         camera.make_perspective(
-    //             CAMERA_FOV,
-    //             resolution.0 as f32 / resolution.1 as f32,
-    //             CAMEREA_NEAR,
-    //             CAMEREA_FAR,
-    //         );
-    //         renderer.re_create_texture(
-    //             TextureDescriptor {
-    //                 size: window.size().into(),
-    //                 format: TextureFormat::Depth32F,
-    //                 ..Default::default()
-    //             },
-    //             depth_texture,
-    //         );
-    //     }
-
-    //     cube.instances.iter_mut().for_each(|e| {
-    //         e.rotate(20.0f32.to_radians() * dt, Vec3::Y);
-    //     });
-
-    //     cube.update(renderer);
-
-    //     let camera = renderer.get_typed_bind_group_mut(camera_handle).unwrap();
-    //     camera.update(window.events(), dt);
-
-    //     // RENDER
-    //     let data = camera.get_data();
-    //     renderer.write_bind_group(camera_handle.into(), &data);
-
-    //     let mut pass = renderer.new_pass(&mut window);
-    //     pass.with_depth(depth_texture, Some(1.0))
-    //         .with_alpha(0.0)
-    //         .set_shader(shader)
-    //         .bind(0, camera_handle.into())
-    //         .render(&[&cube]);
-    //     pass.submit();
-
-    //     renderer.present();
-    // }
 }
