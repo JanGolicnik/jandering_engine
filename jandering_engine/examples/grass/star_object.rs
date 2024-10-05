@@ -1,6 +1,6 @@
 use jandering_engine::{
     object::{primitives::triangle_data, Renderable, Vertex},
-    renderer::{BufferHandle, Renderer},
+    renderer::{BufferHandle, Janderer, Renderer},
 };
 
 pub struct StarObject {

@@ -1,8 +1,5 @@
 use jandering_engine::{
-    {
-        object::{Renderable, Vertex},
-        renderer::{BufferHandle, Renderer},
-    },
+    object::{Renderable, Vertex}, renderer::{BufferHandle, Janderer, Renderer},
     utils::load_obj,
 };
 

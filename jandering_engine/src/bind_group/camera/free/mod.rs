@@ -90,9 +90,9 @@ impl MatrixCameraBindGroup {
         }
     }
 
-    pub fn with_controller(renderer: &mut Renderer, controller: Box<dyn CameraController>) -> Self {
+    pub fn with_controller(renderer: &mut Renderer, controller: impl CameraController + 'static) -> Self {
         let mut this = Self::new(renderer);
-        this.attach_controller(controller);
+        this.attach_controller(Box::new(controller));
         this
     }
 
