@@ -36,8 +36,7 @@ fn main() {
 
     let renderer = &mut engine.renderer;
 
-    let controller: Box<dyn CameraController> = Box::<FreeCameraController>::default();
-    let mut camera = MatrixCameraBindGroup::with_controller(renderer, controller);
+    let mut camera = MatrixCameraBindGroup::with_controller(renderer, FreeCameraController::default());
     camera.make_perspective(CAMERA_FOV, 1.0, CAMEREA_NEAR, CAMEREA_FAR);
 
     let shader = renderer.create_shader(
