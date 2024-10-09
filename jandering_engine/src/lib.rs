@@ -10,4 +10,3 @@ pub mod texture;
 pub mod types;
 pub mod utils;
 pub use je_windowing as window;
-pub(crate) mod rc_vec;

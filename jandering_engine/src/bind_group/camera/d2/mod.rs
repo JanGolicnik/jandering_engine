@@ -1,5 +1,8 @@
 use crate::{
-    bind_group::{BindGroup, BindGroupLayout, BindGroupLayoutEntry},
+    bind_group::{
+        BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutDescriptorEntry,
+        BindGroupLayoutEntry,
+    },
     renderer::{BufferHandle, Janderer, Renderer},
     types::{UVec2, Vec2},
 };
@@ -42,13 +45,18 @@ pub struct D2CameraBindGroup {
 }
 
 impl BindGroup for D2CameraBindGroup {
-    fn get_data(&self) -> Box<[u8]> {
-        bytemuck::cast_slice(&[self.data]).into()
-    }
-
     fn get_layout(&self) -> BindGroupLayout {
         BindGroupLayout {
             entries: vec![BindGroupLayoutEntry::Data(self.buffer_handle)],
+        }
+    }
+
+    fn get_layout_descriptor() -> crate::bind_group::BindGroupLayoutDescriptor
+    where
+        Self: Sized,
+    {
+        BindGroupLayoutDescriptor {
+            entries: vec![BindGroupLayoutDescriptorEntry::Data { is_uniform: true }],
         }
     }
 }

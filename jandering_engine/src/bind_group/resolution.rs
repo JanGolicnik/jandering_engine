@@ -3,7 +3,10 @@ use crate::{
     types::UVec2,
 };
 
-use super::{BindGroup, BindGroupLayout, BindGroupLayoutEntry};
+use super::{
+    BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutDescriptorEntry,
+    BindGroupLayoutEntry,
+};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -20,13 +23,18 @@ pub struct ResolutionBindGroup {
 }
 
 impl BindGroup for ResolutionBindGroup {
-    fn get_data(&self) -> Box<[u8]> {
-        bytemuck::cast_slice(&[self.data]).into()
-    }
-
     fn get_layout(&self) -> BindGroupLayout {
         BindGroupLayout {
             entries: vec![BindGroupLayoutEntry::Data(self.buffer_handle)],
+        }
+    }
+
+    fn get_layout_descriptor() -> super::BindGroupLayoutDescriptor
+    where
+        Self: Sized,
+    {
+        BindGroupLayoutDescriptor {
+            entries: vec![BindGroupLayoutDescriptorEntry::Data { is_uniform: true }],
         }
     }
 }

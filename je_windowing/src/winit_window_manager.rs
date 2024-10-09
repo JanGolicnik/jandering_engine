@@ -1,8 +1,6 @@
 use std::{
     collections::HashMap,
-    sync::{
-        Arc, Mutex,
-    },
+    sync::{Arc, Mutex},
 };
 
 use winit::{
@@ -15,9 +13,6 @@ use crate::{
     winit_window::{InnerWinitWindow, WinitWindow},
     Events, WindowConfig, WindowId, WindowManagerTrait,
 };
-
-#[cfg(windows)]
-use winit::platform::windows::EventLoopBuilderExtWindows;
 
 #[derive(Debug)]
 pub struct WinitWindowManager {
@@ -66,14 +61,17 @@ impl WindowManagerTrait for WinitWindowManager {
 
         self.queued_windows.insert(id, inner_window.clone());
 
-        WinitWindow { id, inner_window, polled_events: Default::default()}
+        WinitWindow {
+            id,
+            inner_window,
+            polled_events: Default::default(),
+        }
     }
 
     fn end(&mut self) {
         self.should_end = true;
     }
 }
-
 
 struct WinitEventHandler<F: FnMut(&mut WinitWindowManager)> {
     is_init: bool, // we get a random resized event that fucks everything up, this ignores it
@@ -85,13 +83,9 @@ struct WinitEventHandler<F: FnMut(&mut WinitWindowManager)> {
 
 impl<F: FnMut(&mut WinitWindowManager)> WinitEventHandler<F> {
     fn create_queued_windows(&mut self, event_loop: &ActiveEventLoop) {
-        for (id, window_arc) in self
-            .window_manager
-            .queued_windows
-            .drain()
-        {
+        for (id, window_arc) in self.window_manager.queued_windows.drain() {
             let mut window_lock = window_arc.lock().unwrap();
-            let InnerWinitWindow::Uninitalized { config } = & *window_lock else {
+            let InnerWinitWindow::Uninitalized { config } = &*window_lock else {
                 continue;
             };
 
@@ -137,7 +131,7 @@ impl<F: FnMut(&mut WinitWindowManager)> WinitEventHandler<F> {
 
             let winit_window = event_loop.create_window(window_attributes).unwrap();
             winit_window.set_cursor_visible(config.show_cursor);
-            
+
             #[cfg(target_arch = "wasm32")]
             {
                 web_sys::window()
@@ -152,14 +146,22 @@ impl<F: FnMut(&mut WinitWindowManager)> WinitEventHandler<F> {
                     .expect("coulnt append canvas to document body");
             }
 
-            self.window_manager.ids_to_handles.insert(winit_window.id(), id);
+            self.window_manager
+                .ids_to_handles
+                .insert(winit_window.id(), id);
 
-            *window_lock = InnerWinitWindow::Initialized { window: winit_window, events: Events::with_initialized(), last_redraw_time: web_time::Instant::now(), should_close: false, fps_preference: config.fps_preference};
+            *window_lock = InnerWinitWindow::Initialized {
+                window: winit_window,
+                events: Events::with_initialized(),
+                last_redraw_time: web_time::Instant::now(),
+                should_close: false,
+                fps_preference: config.fps_preference,
+            };
 
             self.window_manager.windows.insert(id, window_arc.clone());
         }
 
-        if ! self.window_manager.queued_windows.is_empty(){
+        if !self.window_manager.queued_windows.is_empty() {
             panic!("somehow windows werent properly queued up!!")
         }
     }
@@ -189,7 +191,7 @@ impl<F: FnMut(&mut WinitWindowManager)> ApplicationHandler<()> for WinitEventHan
         for (_, window) in self.window_manager.windows.iter_mut() {
             if let event::DeviceEvent::MouseMotion { delta } = event {
                 let mut window = window.lock().unwrap();
-                let InnerWinitWindow::Initialized {  events, ..}  = &mut *window else {
+                let InnerWinitWindow::Initialized { events, .. } = &mut *window else {
                     return;
                 };
                 events.push(crate::WindowEvent::RawMouseMotion((
@@ -217,10 +219,16 @@ impl<F: FnMut(&mut WinitWindowManager)> ApplicationHandler<()> for WinitEventHan
             event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
         }
 
-        let Some((window, _)) = self
-            .window_manager.ids_to_handles
-            .get(&window_id)
-            .and_then(|handle| self.window_manager.windows.get_mut(handle).map(|win| (win, handle)))
+        let Some((window, _)) =
+            self.window_manager
+                .ids_to_handles
+                .get(&window_id)
+                .and_then(|handle| {
+                    self.window_manager
+                        .windows
+                        .get_mut(handle)
+                        .map(|win| (win, handle))
+                })
         else {
             return;
         };
@@ -236,12 +244,12 @@ impl<F: FnMut(&mut WinitWindowManager)> ApplicationHandler<()> for WinitEventHan
             }
         }
 
-        {        
+        {
             let mut window = window.lock().unwrap();
             window.handle_event(event);
         }
 
-        if matches!(event, crate::WindowEvent::RedrawRequested ) {
+        if matches!(event, crate::WindowEvent::RedrawRequested) {
             (self.update_function)(&mut self.window_manager);
         }
     }

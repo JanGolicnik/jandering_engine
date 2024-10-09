@@ -160,5 +160,5 @@ pub trait Janderer {
         handle: BindGroupHandle<T>,
     ) -> Option<&mut T>;
 
-    fn write_bind_group(&mut self, handle: UntypedBindGroupHandle, data: &[u8]);
+    // fn write_bind_group(&mut self, handle: UntypedBindGroupHandle, data: &[u8]);
 }

@@ -1,7 +1,10 @@
 use wgpu::VertexAttribute;
 
 use crate::{
-    bind_group::{BindGroupLayout, BindGroupLayoutEntry},
+    bind_group::{
+        BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutDescriptorEntry,
+        BindGroupLayoutEntry,
+    },
     renderer::{BindGroupHandle, UntypedBindGroupHandle},
     shader::BufferLayout,
 };
@@ -9,69 +12,74 @@ use crate::{
 use super::WGPURenderer;
 
 impl WGPURenderer {
-    pub fn get_layout(device: &wgpu::Device, layout: &BindGroupLayout) -> wgpu::BindGroupLayout {
-        let entries: Vec<_> = layout
-            .entries
+    pub fn get_layout_descriptor<'a, T: Into<BindGroupLayoutDescriptorEntry> + Clone>(
+        device: &wgpu::Device,
+        entries: &'a [T],
+    ) -> wgpu::BindGroupLayout {
+        let entries: Vec<_> = entries
             .iter()
-            .map(|e| match e {
-                BindGroupLayoutEntry::Data(handle) => {
-                    let ty = wgpu::BindingType::Buffer {
-                        ty: match handle.buffer_type {
-                            crate::renderer::BufferType::Uniform => {
+            .map(
+                |e| match Into::<BindGroupLayoutDescriptorEntry>::into(e.clone()) {
+                    BindGroupLayoutDescriptorEntry::Data { is_uniform, .. } => {
+                        let ty = wgpu::BindingType::Buffer {
+                            ty: if is_uniform {
                                 wgpu::BufferBindingType::Uniform
-                            }
-                            crate::renderer::BufferType::Storage => {
+                            } else {
                                 wgpu::BufferBindingType::Storage { read_only: false }
-                            }
-                        },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    };
+                            },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        };
 
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::COMPUTE
-                            | wgpu::ShaderStages::VERTEX
-                            | wgpu::ShaderStages::FRAGMENT,
-                        ty,
-                        count: None,
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::COMPUTE
+                                | wgpu::ShaderStages::VERTEX
+                                | wgpu::ShaderStages::FRAGMENT,
+                            ty,
+                            count: None,
+                        }
                     }
-                }
-                BindGroupLayoutEntry::Texture { depth, .. } => wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::COMPUTE
-                        | wgpu::ShaderStages::VERTEX
-                        | wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: if *depth {
-                            wgpu::TextureSampleType::Depth
-                        } else {
-                            wgpu::TextureSampleType::Float { filterable: true }
-                        },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
+                    BindGroupLayoutDescriptorEntry::Texture { depth, .. } => {
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::COMPUTE
+                                | wgpu::ShaderStages::VERTEX
+                                | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Texture {
+                                sample_type: if depth {
+                                    wgpu::TextureSampleType::Depth
+                                } else {
+                                    wgpu::TextureSampleType::Float { filterable: true }
+                                },
+                                view_dimension: wgpu::TextureViewDimension::D2,
+                                multisampled: false,
+                            },
+                            count: None,
+                        }
+                    }
+                    BindGroupLayoutDescriptorEntry::Sampler { sampler_type, .. } => {
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::COMPUTE
+                                | wgpu::ShaderStages::VERTEX
+                                | wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Sampler(match sampler_type {
+                                crate::bind_group::SamplerType::Filtering => {
+                                    wgpu::SamplerBindingType::Filtering
+                                }
+                                crate::bind_group::SamplerType::NonFiltering => {
+                                    wgpu::SamplerBindingType::NonFiltering
+                                }
+                                crate::bind_group::SamplerType::Comparison => {
+                                    wgpu::SamplerBindingType::Comparison
+                                }
+                            }),
+                            count: None,
+                        }
+                    }
                 },
-                BindGroupLayoutEntry::Sampler { sampler_type, .. } => wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::COMPUTE
-                        | wgpu::ShaderStages::VERTEX
-                        | wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(match sampler_type {
-                        crate::bind_group::SamplerType::Filtering => {
-                            wgpu::SamplerBindingType::Filtering
-                        }
-                        crate::bind_group::SamplerType::NonFiltering => {
-                            wgpu::SamplerBindingType::NonFiltering
-                        }
-                        crate::bind_group::SamplerType::Comparison => {
-                            wgpu::SamplerBindingType::Comparison
-                        }
-                    }),
-                    count: None,
-                },
-            })
+            )
             .collect();
 
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -80,14 +88,43 @@ impl WGPURenderer {
         })
     }
 
-    pub fn get_layouts(
+    pub fn get_layout_descriptors(
         device: &wgpu::Device,
-        layouts: &[BindGroupLayout],
+        layouts: &[BindGroupLayoutDescriptor],
     ) -> Vec<wgpu::BindGroupLayout> {
         layouts
             .iter()
-            .map(|e| Self::get_layout(device, e))
+            .map(|e| Self::get_layout_descriptor(device, &e.entries))
             .collect()
+    }
+
+    pub fn get_layout_and_entries<'a>(
+        &'a self,
+        device: &'a wgpu::Device,
+        layout: &BindGroupLayout,
+    ) -> (wgpu::BindGroupLayout, Vec<wgpu::BindGroupEntry<'a>>) {
+        let bind_group_layout = Self::get_layout_descriptor(device, &layout.entries);
+        let entries = layout
+            .entries
+            .iter()
+            .enumerate()
+            .map(|(i, entry)| wgpu::BindGroupEntry {
+                binding: i as u32,
+                resource: match entry {
+                    BindGroupLayoutEntry::Data(handle) => {
+                        self.buffers[handle.index].as_entire_binding()
+                    }
+                    BindGroupLayoutEntry::Texture { handle, .. } => {
+                        wgpu::BindingResource::TextureView(&self.textures[handle.0].view)
+                    }
+                    BindGroupLayoutEntry::Sampler { handle, .. } => {
+                        wgpu::BindingResource::Sampler(&self.samplers[handle.0])
+                    }
+                },
+            })
+            .collect::<Vec<_>>();
+
+        (bind_group_layout, entries)
     }
 
     pub fn get_buffer_attributes(layout: &BufferLayout) -> Vec<VertexAttribute> {

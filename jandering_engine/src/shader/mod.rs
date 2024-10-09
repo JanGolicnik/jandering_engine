@@ -1,6 +1,4 @@
-use crate::texture::TextureFormat;
-
-use super::bind_group::BindGroupLayout;
+use crate::{bind_group::BindGroupLayoutDescriptor, texture::TextureFormat};
 
 #[derive(Clone)]
 pub enum ShaderSource {
@@ -50,7 +48,7 @@ pub struct BufferLayout {
 pub struct ShaderDescriptor {
     pub source: ShaderSource,
     pub descriptors: Vec<BufferLayout>,
-    pub bind_group_layouts: Vec<BindGroupLayout>,
+    pub bind_group_layout_descriptors: Vec<BindGroupLayoutDescriptor>,
     pub vs_entry: &'static str,
     pub fs_entry: &'static str,
     pub backface_culling: bool,
@@ -63,7 +61,7 @@ pub struct ShaderDescriptor {
 #[derive(Clone)]
 pub struct ComputeShaderDescriptor {
     pub source: ShaderSource,
-    pub bind_group_layouts: Vec<BindGroupLayout>,
+    pub bind_group_layout_descriptors: Vec<BindGroupLayoutDescriptor>,
     pub entry: &'static str,
 }
 
@@ -72,7 +70,7 @@ impl Default for ShaderDescriptor {
         Self {
             source: ShaderSource::Code(include_str!("default_shader.wgsl").to_string()),
             descriptors: Vec::new(),
-            bind_group_layouts: Vec::new(),
+            bind_group_layout_descriptors: Vec::new(),
             vs_entry: "vs_main",
             fs_entry: "fs_main",
             backface_culling: true,
@@ -104,8 +102,11 @@ impl ShaderDescriptor {
         self
     }
 
-    pub fn with_bind_group_layouts(mut self, layouts: Vec<BindGroupLayout>) -> Self {
-        self.bind_group_layouts = layouts;
+    pub fn with_bind_group_layout_descriptors(
+        mut self,
+        layouts: Vec<BindGroupLayoutDescriptor>,
+    ) -> Self {
+        self.bind_group_layout_descriptors = layouts;
         self
     }
 

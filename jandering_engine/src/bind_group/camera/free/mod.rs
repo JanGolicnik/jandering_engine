@@ -1,8 +1,10 @@
 use crate::{
-    bind_group::{BindGroup, BindGroupLayout, BindGroupLayoutEntry},
-    renderer::{BufferHandle, Janderer, Renderer},
+    bind_group::{
+        BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutDescriptorEntry,
+        BindGroupLayoutEntry,
+    },
+    renderer::{BindGroupHandle, BufferHandle, Janderer, Renderer, UntypedBindGroupHandle},
     types::{Mat4, Vec2, Vec3},
-    
 };
 
 use je_windowing::{Events, InputState, Key, WindowEvent};
@@ -46,16 +48,22 @@ pub trait CameraController {
     fn update(&mut self, position: &mut Vec3, direction: &mut Vec3, dt: f32);
 }
 
-pub struct MatrixCameraBindGroup {
-    data: CameraData,
-    proj: Mat4,
-    pub controller: Option<Box<dyn CameraController>>,
+struct MatrixCameraBindGroup {
     buffer_handle: BufferHandle,
 }
 
+pub struct MatrixCamera {
+    bind_group: BindGroupHandle<MatrixCameraBindGroup>,
+    data: CameraData,
+    proj: Mat4,
+    pub controller: Option<Box<dyn CameraController>>,
+}
+
 impl BindGroup for MatrixCameraBindGroup {
-    fn get_data(&self) -> Box<[u8]> {
-        bytemuck::cast_slice(&[self.data]).into()
+    fn get_layout_descriptor() -> BindGroupLayoutDescriptor {
+        BindGroupLayoutDescriptor {
+            entries: vec![BindGroupLayoutDescriptorEntry::Data { is_uniform: true }],
+        }
     }
 
     fn get_layout(&self) -> BindGroupLayout {
@@ -65,7 +73,7 @@ impl BindGroup for MatrixCameraBindGroup {
     }
 }
 
-impl MatrixCameraBindGroup {
+impl MatrixCamera {
     pub fn new(renderer: &mut Renderer) -> Self {
         let data = CameraData {
             up: Vec3::ZERO,
@@ -82,15 +90,24 @@ impl MatrixCameraBindGroup {
 
         let buffer_handle = renderer.create_uniform_buffer(bytemuck::cast_slice(&[data]));
 
+        let bind_group = renderer.create_typed_bind_group(MatrixCameraBindGroup { buffer_handle });
+
         Self {
-            data,
+            bind_group,
             proj: Mat4::IDENTITY,
             controller: None,
-            buffer_handle,
+            data,
         }
     }
 
-    pub fn with_controller(renderer: &mut Renderer, controller: impl CameraController + 'static) -> Self {
+    pub fn get_layout_descriptor(&self) -> BindGroupLayoutDescriptor {
+        MatrixCameraBindGroup::get_layout_descriptor()
+    }
+
+    pub fn with_controller(
+        renderer: &mut Renderer,
+        controller: impl CameraController + 'static,
+    ) -> Self {
         let mut this = Self::new(renderer);
         this.attach_controller(Box::new(controller));
         this
@@ -130,7 +147,7 @@ impl MatrixCameraBindGroup {
         self.data.inverse_view = view.inverse();
     }
 
-    pub fn update(&mut self, events: &Events, dt: f32) {
+    pub fn update(&mut self, renderer: &mut Renderer, events: &Events, dt: f32) {
         if let Some(controller) = &mut self.controller {
             let controller = controller.as_mut();
 
@@ -141,7 +158,10 @@ impl MatrixCameraBindGroup {
             controller.update(&mut self.data.position, &mut self.data.direction, dt);
         }
 
-        self.update_data()
+        self.update_data();
+
+        let bind_group = renderer.get_typed_bind_group(self.bind_group).unwrap();
+        renderer.write_buffer(bind_group.buffer_handle, bytemuck::cast_slice(&[self.data]));
     }
     pub fn attach_controller(&mut self, controller: Box<dyn CameraController>) -> &mut Self {
         self.controller = Some(controller);
@@ -169,6 +189,9 @@ impl MatrixCameraBindGroup {
     }
     pub fn right(&self) -> Vec3 {
         self.data.right
+    }
+    pub fn bind_group(&self) -> UntypedBindGroupHandle {
+        self.bind_group.into()
     }
 }
 

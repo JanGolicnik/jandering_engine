@@ -4,7 +4,7 @@ use compute_pass::WGPUComputePass;
 use wgpu::{util::DeviceExt, ComputePipelineDescriptor, Features, PresentMode, SurfaceTexture};
 
 use crate::{
-    bind_group::{BindGroup, BindGroupLayoutEntry},
+    bind_group::BindGroup,
     engine::EngineConfig,
     render_pass::{RenderPass, RenderStep},
     renderer::{
@@ -27,7 +27,6 @@ pub mod compute_pass;
 
 struct WGPUBindGroupRenderData {
     pub bind_group: wgpu::BindGroup,
-    pub buffer_handle: BufferHandle,
 }
 
 pub struct WGPUShader {
@@ -269,7 +268,8 @@ impl Janderer for WGPURenderer {
 
     fn create_shader_at(&mut self, desc: ShaderDescriptor, handle: ShaderHandle) {
         //ugly ass code fuck off
-        let bind_group_layouts = Self::get_layouts(&self.device, &desc.bind_group_layouts);
+        let bind_group_layouts =
+            Self::get_layout_descriptors(&self.device, &desc.bind_group_layout_descriptors);
         let bind_group_ref = bind_group_layouts.iter().collect::<Vec<_>>();
 
         let layout = self
@@ -537,57 +537,58 @@ impl Janderer for WGPURenderer {
         }
     }
 
-    fn write_bind_group(&mut self, handle: UntypedBindGroupHandle) {
-        let render_data = &self.bind_groups_render_data[handle.0];
-        let data = &self.bind_groups[handle.0].get_data();
-        let layout = &self.bind_groups[handle.0].get_layout();
+    // fn write_bind_group(&mut self, handle: UntypedBindGroupHandle) {
+    //     let render_data = &self.bind_groups_render_data[handle.0];
 
-        for entry in layout.entries {
-            match entry {
-                BindGroupLayoutEntry::Data(buffer_handle) => {
-                    self.queue
-                        .write_buffer(&self.buffers[render_data.buffer_handle.index], 0, data)
-                }
-                BindGroupLayoutEntry::Texture { handle, depth } => todo!(),
-                BindGroupLayoutEntry::Sampler {
-                    handle,
-                    sampler_type,
-                } => todo!(),
-            }
-        }
+    //     let data = &self.bind_groups[handle.0].get_data();
+    //     let layout = &self.bind_groups[handle.0].get_layout();
 
-        let mut first_handle = BufferHandle::uniform(0); // TODO FIX THIS LMAO
-        let entries = layout
-            .entries
-            .iter()
-            .enumerate()
-            .map(|(i, entry)| wgpu::BindGroupEntry {
-                binding: i as u32,
-                resource: match entry {
-                    BindGroupLayoutEntry::Data(handle) => {
-                        self.buffers[first_handle.index].as_entire_binding()
-                    }
-                    BindGroupLayoutEntry::Texture { handle, .. } => {
-                        wgpu::BindingResource::TextureView(&self.textures[handle.0].view)
-                    }
-                    BindGroupLayoutEntry::Sampler { handle, .. } => {
-                        wgpu::BindingResource::Sampler(&self.samplers[handle.0])
-                    }
-                },
-            })
-            .collect::<Vec<_>>();
+    //     for entry in layout.entries {
+    //         match entry {
+    //             BindGroupLayoutEntry::Data(buffer_handle) => {
+    //                 self.queue
+    //                     .write_buffer(&self.buffers[buffer_handle.index], 0, data)
+    //             }
+    //             BindGroupLayoutEntry::Texture { handle, depth } => todo!(),
+    //             BindGroupLayoutEntry::Sampler {
+    //                 handle,
+    //                 sampler_type,
+    //             } => todo!(),
+    //         }
+    //     }
 
-        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &bind_group_layout,
-            entries: &entries[..],
-            label: Some("bind_group"),
-        });
+    //     let mut first_handle = BufferHandle::uniform(0); // TODO FIX THIS LMAO
+    //     let entries = layout
+    //         .entries
+    //         .iter()
+    //         .enumerate()
+    //         .map(|(i, entry)| wgpu::BindGroupEntry {
+    //             binding: i as u32,
+    //             resource: match entry {
+    //                 BindGroupLayoutEntry::Data(handle) => {
+    //                     self.buffers[first_handle.index].as_entire_binding()
+    //                 }
+    //                 BindGroupLayoutEntry::Texture { handle, .. } => {
+    //                     wgpu::BindingResource::TextureView(&self.textures[handle.0].view)
+    //                 }
+    //                 BindGroupLayoutEntry::Sampler { handle, .. } => {
+    //                     wgpu::BindingResource::Sampler(&self.samplers[handle.0])
+    //                 }
+    //             },
+    //         })
+    //         .collect::<Vec<_>>();
 
-        let data = WGPUBindGroupRenderData {
-            bind_group,
-            buffer_handle: first_handle,
-        };
-    }
+    //     let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+    //         layout: &bind_group_layout,
+    //         entries: &entries[..],
+    //         label: Some("bind_group"),
+    //     });
+
+    //     let data = WGPUBindGroupRenderData {
+    //         bind_group,
+    //         buffer_handle: first_handle,
+    //     };
+    // }
 
     fn create_bind_group_at(
         &mut self,
@@ -596,28 +597,7 @@ impl Janderer for WGPURenderer {
     ) {
         {
             let layout = bind_group.get_layout();
-            let bind_group_layout = Self::get_layout(&self.device, &layout);
-            let mut first_handle = BufferHandle::uniform(0); // TODO FIX THIS LMAO
-            let entries = layout
-                .entries
-                .iter()
-                .enumerate()
-                .map(|(i, entry)| wgpu::BindGroupEntry {
-                    binding: i as u32,
-                    resource: match entry {
-                        BindGroupLayoutEntry::Data(handle) => {
-                            first_handle = *handle;
-                            self.buffers[first_handle.index].as_entire_binding()
-                        }
-                        BindGroupLayoutEntry::Texture { handle, .. } => {
-                            wgpu::BindingResource::TextureView(&self.textures[handle.0].view)
-                        }
-                        BindGroupLayoutEntry::Sampler { handle, .. } => {
-                            wgpu::BindingResource::Sampler(&self.samplers[handle.0])
-                        }
-                    },
-                })
-                .collect::<Vec<_>>();
+            let (bind_group_layout, entries) = self.get_layout_and_entries(&self.device, &layout);
 
             let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 layout: &bind_group_layout,
@@ -625,10 +605,7 @@ impl Janderer for WGPURenderer {
                 label: Some("bind_group"),
             });
 
-            let data = WGPUBindGroupRenderData {
-                bind_group,
-                buffer_handle: first_handle,
-            };
+            let data = WGPUBindGroupRenderData { bind_group };
 
             if handle.0 >= self.bind_groups.len() {
                 self.bind_groups_render_data.push(data);
@@ -708,7 +685,8 @@ impl Janderer for WGPURenderer {
         let shader = self.device.create_shader_module(shader_desc);
 
         //ugly ass code fuck off
-        let bind_group_layouts = Self::get_layouts(&self.device, &desc.bind_group_layouts);
+        let bind_group_layouts =
+            Self::get_layout_descriptors(&self.device, &desc.bind_group_layout_descriptors);
         let bind_group_ref = bind_group_layouts.iter().collect::<Vec<_>>();
 
         let layout = self

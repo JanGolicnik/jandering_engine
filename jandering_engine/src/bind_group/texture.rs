@@ -8,10 +8,6 @@ pub struct TextureBindGroup {
 }
 
 impl BindGroup for TextureBindGroup {
-    fn get_data(&self) -> Box<[u8]> {
-        Box::new([])
-    }
-
     fn get_layout(&self) -> BindGroupLayout {
         BindGroupLayout {
             entries: vec![
@@ -21,6 +17,20 @@ impl BindGroup for TextureBindGroup {
                 },
                 BindGroupLayoutEntry::Sampler {
                     handle: self.sampler_handle,
+                    sampler_type: SamplerType::Filtering,
+                },
+            ],
+        }
+    }
+
+    fn get_layout_descriptor() -> super::BindGroupLayoutDescriptor
+    where
+        Self: Sized,
+    {
+        super::BindGroupLayoutDescriptor {
+            entries: vec![
+                super::BindGroupLayoutDescriptorEntry::Texture { depth: false },
+                super::BindGroupLayoutDescriptorEntry::Sampler {
                     sampler_type: SamplerType::Filtering,
                 },
             ],
