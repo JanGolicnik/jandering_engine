@@ -1,14 +1,16 @@
-
 use jandering_engine::{
     bind_group::{
-        camera::free::{CameraController, FreeCameraController, MatrixCameraBindGroup},
+        camera::free::{FreeCameraController, MatrixCameraBindGroup},
         BindGroup,
     },
     engine::Engine,
     object::{Instance, Object, Vertex},
     renderer::Janderer,
     shader::ShaderDescriptor,
-    texture::{texture_usage::{self}, TextureDescriptor, TextureFormat},
+    texture::{
+        texture_usage::{self},
+        TextureDescriptor, TextureFormat,
+    },
     types::{UVec2, Vec3},
     window::{WindowConfig, WindowEvent, WindowManagerTrait, WindowTrait},
 };
@@ -33,10 +35,10 @@ fn main() {
             .with_title("beast"),
     );
 
-
     let renderer = &mut engine.renderer;
 
-    let mut camera = MatrixCameraBindGroup::with_controller(renderer, FreeCameraController::default());
+    let mut camera =
+        MatrixCameraBindGroup::with_controller(renderer, FreeCameraController::default());
     camera.make_perspective(CAMERA_FOV, 1.0, CAMEREA_NEAR, CAMEREA_FAR);
 
     let shader = renderer.create_shader(
@@ -49,21 +51,19 @@ fn main() {
 
     let camera_handle = renderer.create_typed_bind_group(camera);
 
-    const COUNT:i32 = 1;
+    const COUNT: i32 = 1;
     let mut cube_instance_grid = Vec::new();
-    for x in -COUNT..=COUNT{
-        for y in -COUNT..=COUNT{
-            for z in -COUNT..=COUNT{
-                cube_instance_grid.push(Instance::default().translate(Vec3::new(x as f32, y as f32, z as f32) * 10.0));
+    for x in -COUNT..=COUNT {
+        for y in -COUNT..=COUNT {
+            for z in -COUNT..=COUNT {
+                cube_instance_grid.push(
+                    Instance::default().translate(Vec3::new(x as f32, y as f32, z as f32) * 10.0),
+                );
             }
         }
     }
-    
-    let mut cube = Object::from_obj(
-        include_str!("cube.obj"),
-        renderer,
-        cube_instance_grid,
-    );
+
+    let mut cube = Object::from_obj(include_str!("cube.obj"), renderer, cube_instance_grid);
 
     let depth_texture = renderer.create_texture(TextureDescriptor {
         size: UVec2::splat(resolution),
@@ -73,17 +73,17 @@ fn main() {
     });
 
     let mut last_time = web_time::Instant::now();
-    engine.run(move |renderer, window_manager|{
-        if window.should_close(){
+    engine.run(move |renderer, window_manager| {
+        if window.should_close() {
             window_manager.end();
         }
 
         window.poll_events();
 
         for event in window.events().iter() {
-            match event{
+            match event {
                 WindowEvent::WindowInitialized => renderer.register_window(&window),
-                _=>{}
+                _ => {}
             }
         }
 
@@ -92,7 +92,8 @@ fn main() {
         last_time = current_time;
 
         if window
-            .events().matches(|e| matches!(e, WindowEvent::Resized(_)))
+            .events()
+            .matches(|e| matches!(e, WindowEvent::Resized(_)))
         {
             let resolution = window.size();
 

@@ -537,10 +537,56 @@ impl Janderer for WGPURenderer {
         }
     }
 
-    fn write_bind_group(&mut self, handle: UntypedBindGroupHandle, data: &[u8]) {
+    fn write_bind_group(&mut self, handle: UntypedBindGroupHandle) {
         let render_data = &self.bind_groups_render_data[handle.0];
-        self.queue
-            .write_buffer(&self.buffers[render_data.buffer_handle.index], 0, data);
+        let data = &self.bind_groups[handle.0].get_data();
+        let layout = &self.bind_groups[handle.0].get_layout();
+
+        for entry in layout.entries {
+            match entry {
+                BindGroupLayoutEntry::Data(buffer_handle) => {
+                    self.queue
+                        .write_buffer(&self.buffers[render_data.buffer_handle.index], 0, data)
+                }
+                BindGroupLayoutEntry::Texture { handle, depth } => todo!(),
+                BindGroupLayoutEntry::Sampler {
+                    handle,
+                    sampler_type,
+                } => todo!(),
+            }
+        }
+
+        let mut first_handle = BufferHandle::uniform(0); // TODO FIX THIS LMAO
+        let entries = layout
+            .entries
+            .iter()
+            .enumerate()
+            .map(|(i, entry)| wgpu::BindGroupEntry {
+                binding: i as u32,
+                resource: match entry {
+                    BindGroupLayoutEntry::Data(handle) => {
+                        self.buffers[first_handle.index].as_entire_binding()
+                    }
+                    BindGroupLayoutEntry::Texture { handle, .. } => {
+                        wgpu::BindingResource::TextureView(&self.textures[handle.0].view)
+                    }
+                    BindGroupLayoutEntry::Sampler { handle, .. } => {
+                        wgpu::BindingResource::Sampler(&self.samplers[handle.0])
+                    }
+                },
+            })
+            .collect::<Vec<_>>();
+
+        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &bind_group_layout,
+            entries: &entries[..],
+            label: Some("bind_group"),
+        });
+
+        let data = WGPUBindGroupRenderData {
+            bind_group,
+            buffer_handle: first_handle,
+        };
     }
 
     fn create_bind_group_at(

@@ -85,13 +85,17 @@ pub trait WindowTrait {
 }
 
 impl raw_window_handle::HasWindowHandle for Window {
-    fn window_handle(&self) -> Result<raw_window_handle::WindowHandle<'_>, raw_window_handle::HandleError> {
+    fn window_handle(
+        &self,
+    ) -> Result<raw_window_handle::WindowHandle<'_>, raw_window_handle::HandleError> {
         Ok(self.get_window_handle())
     }
 }
 
 impl raw_window_handle::HasDisplayHandle for Window {
-    fn display_handle(&self) -> Result<raw_window_handle::DisplayHandle<'_>, raw_window_handle::HandleError> {
+    fn display_handle(
+        &self,
+    ) -> Result<raw_window_handle::DisplayHandle<'_>, raw_window_handle::HandleError> {
         Ok(self.get_display_handle())
     }
 }
@@ -240,7 +244,7 @@ pub enum WindowEvent {
     MouseEntered,
     MouseLeft,
 
-    WindowInitialized
+    WindowInitialized,
 }
 
 #[derive(Debug)]
@@ -282,7 +286,7 @@ impl Default for WindowConfig {
             decorations: true,
             resizable: true,
             fullscreen: false,
-            borderless: false
+            borderless: false,
         }
     }
 }
@@ -329,9 +333,8 @@ impl WindowConfig {
         self
     }
     pub fn with_position(mut self, x: u32, y: u32) -> Self {
-        self.position= Some((x,y));
-        self            
-
+        self.position = Some((x, y));
+        self
     }
     pub fn resizable(mut self, value: bool) -> Self {
         self.resizable = value;
@@ -339,14 +342,16 @@ impl WindowConfig {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Events {
     events: Vec<WindowEvent>,
 }
 
 impl Events {
-    pub fn with_initialized() -> Self{
-        Self { events: vec![WindowEvent::WindowInitialized] }
+    pub fn with_initialized() -> Self {
+        Self {
+            events: vec![WindowEvent::WindowInitialized],
+        }
     }
 
     pub fn matches<F>(&self, f: F) -> bool
@@ -369,11 +374,26 @@ impl Events {
             }
         })
     }
+
     pub fn is_mouse_pressed(&self, input_button: MouseButton) -> bool {
         self.events.iter().any(|e| {
             if let WindowEvent::MouseInput {
                 button,
                 state: crate::InputState::Pressed,
+            } = e
+            {
+                *button == input_button
+            } else {
+                false
+            }
+        })
+    }
+
+    pub fn is_mouse_released(&self, input_button: MouseButton) -> bool {
+        self.events.iter().any(|e| {
+            if let WindowEvent::MouseInput {
+                button,
+                state: crate::InputState::Released,
             } = e
             {
                 *button == input_button
