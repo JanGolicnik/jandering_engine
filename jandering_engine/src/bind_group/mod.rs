@@ -30,10 +30,18 @@ impl<T: 'static> BindGroupToAny for T {
     }
 }
 
+#[derive(Clone, Default)]
+pub enum TextureSampleType {
+    #[default]
+    Filterable,
+    NonFilterable,
+    Depth,
+}
+
 #[derive(Clone)]
 pub enum BindGroupLayoutDescriptorEntry {
     Data { is_uniform: bool },
-    Texture { depth: bool },
+    Texture { sample_type: TextureSampleType },
     Sampler { sampler_type: SamplerType },
 }
 
@@ -47,7 +55,7 @@ pub enum BindGroupLayoutEntry {
     Data(BufferHandle),
     Texture {
         handle: TextureHandle,
-        depth: bool,
+        sample_type: TextureSampleType,
     },
     Sampler {
         handle: SamplerHandle,
@@ -61,8 +69,8 @@ impl Into<BindGroupLayoutDescriptorEntry> for BindGroupLayoutEntry {
             BindGroupLayoutEntry::Data(buffer_handle) => BindGroupLayoutDescriptorEntry::Data {
                 is_uniform: matches!(buffer_handle.buffer_type, BufferType::Uniform),
             },
-            BindGroupLayoutEntry::Texture { depth, .. } => {
-                BindGroupLayoutDescriptorEntry::Texture { depth }
+            BindGroupLayoutEntry::Texture { sample_type, .. } => {
+                BindGroupLayoutDescriptorEntry::Texture { sample_type }
             }
             BindGroupLayoutEntry::Sampler { sampler_type, .. } => {
                 BindGroupLayoutDescriptorEntry::Sampler { sampler_type }

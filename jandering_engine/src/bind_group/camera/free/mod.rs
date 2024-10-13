@@ -59,6 +59,12 @@ pub struct MatrixCamera {
     pub controller: Option<Box<dyn CameraController>>,
 }
 
+impl std::fmt::Debug for MatrixCamera {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Point").field("data", &self.data).finish()
+    }
+}
+
 impl BindGroup for MatrixCameraBindGroup {
     fn get_layout_descriptor() -> BindGroupLayoutDescriptor {
         BindGroupLayoutDescriptor {
