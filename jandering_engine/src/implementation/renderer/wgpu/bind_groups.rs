@@ -40,17 +40,23 @@ impl WGPURenderer {
                             count: None,
                         }
                     }
-                    BindGroupLayoutDescriptorEntry::Texture { depth, .. } => {
+                    BindGroupLayoutDescriptorEntry::Texture { sample_type, .. } => {
                         wgpu::BindGroupLayoutEntry {
                             binding: 0,
                             visibility: wgpu::ShaderStages::COMPUTE
                                 | wgpu::ShaderStages::VERTEX
                                 | wgpu::ShaderStages::FRAGMENT,
                             ty: wgpu::BindingType::Texture {
-                                sample_type: if depth {
-                                    wgpu::TextureSampleType::Depth
-                                } else {
-                                    wgpu::TextureSampleType::Float { filterable: true }
+                                sample_type: match sample_type {
+                                    crate::bind_group::TextureSampleType::Filterable => {
+                                        wgpu::TextureSampleType::Float { filterable: true }
+                                    }
+                                    crate::bind_group::TextureSampleType::NonFilterable => {
+                                        wgpu::TextureSampleType::Float { filterable: false }
+                                    }
+                                    crate::bind_group::TextureSampleType::Depth => {
+                                        wgpu::TextureSampleType::Depth
+                                    }
                                 },
                                 view_dimension: wgpu::TextureViewDimension::D2,
                                 multisampled: false,

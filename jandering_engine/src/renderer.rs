@@ -68,6 +68,13 @@ cfg_if::cfg_if! {
     // }
 }
 
+#[derive(Copy, Clone, PartialEq, Debug, Default)]
+pub enum TargetTexture {
+    #[default]
+    Screen,
+    Handle(TextureHandle),
+}
+
 pub trait Janderer {
     #[allow(async_fn_in_trait)]
     #[allow(opaque_hidden_inferred_bound)]

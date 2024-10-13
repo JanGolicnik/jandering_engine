@@ -13,7 +13,7 @@ impl BindGroup for TextureBindGroup {
             entries: vec![
                 BindGroupLayoutEntry::Texture {
                     handle: self.texture_handle,
-                    depth: false,
+                    sample_type: super::TextureSampleType::default(),
                 },
                 BindGroupLayoutEntry::Sampler {
                     handle: self.sampler_handle,
@@ -29,7 +29,9 @@ impl BindGroup for TextureBindGroup {
     {
         super::BindGroupLayoutDescriptor {
             entries: vec![
-                super::BindGroupLayoutDescriptorEntry::Texture { depth: false },
+                super::BindGroupLayoutDescriptorEntry::Texture {
+                    sample_type: Default::default(),
+                },
                 super::BindGroupLayoutDescriptorEntry::Sampler {
                     sampler_type: SamplerType::Filtering,
                 },

@@ -9,7 +9,7 @@ use crate::{
     render_pass::{RenderPass, RenderStep},
     renderer::{
         BindGroupHandle, BufferHandle, ComputeShaderHandle, Janderer, SamplerHandle, ShaderHandle,
-        TextureHandle, UntypedBindGroupHandle,
+        TargetTexture, TextureHandle, UntypedBindGroupHandle,
     },
     shader::{ComputeShaderDescriptor, ShaderDescriptor},
     texture::{
@@ -301,9 +301,15 @@ impl Janderer for WGPURenderer {
             TextureFormat::Depth16U => wgpu::TextureFormat::Depth16Unorm,
         };
 
+        let blend = if format == wgpu::TextureFormat::R32Float {
+            None
+        } else {
+            Some(wgpu::BlendState::ALPHA_BLENDING)
+        };
+
         let targets = &[Some(wgpu::ColorTargetState {
             format,
-            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+            blend,
             write_mask: wgpu::ColorWrites::ALL,
         })];
 
@@ -774,7 +780,7 @@ impl WGPURenderer {
         };
 
         let mut render_pass = None;
-        let previous_target = None;
+        let previous_target = TargetTexture::Screen;
 
         let len = steps.len() - 1;
         for (i, step) in steps.iter().enumerate().take(len) {
@@ -801,16 +807,21 @@ impl WGPURenderer {
             if changed {
                 drop(render_pass);
 
-                let (view, resolve_target) = if let Some(tex) = target {
-                    let view = &renderer.textures[tex.0].view;
-                    let resolve_target = Some(
-                        resolve_target
-                            .map(|tex| &renderer.textures[tex.0].view)
-                            .unwrap_or(&surface_texture_view),
-                    );
-                    (view, resolve_target)
-                } else {
-                    (&surface_texture_view, None)
+                let (view, resolve_target) = match target {
+                    TargetTexture::Screen => (&surface_texture_view, None),
+                    TargetTexture::Handle(texture_handle) => {
+                        let resolve_target = match resolve_target {
+                            Some(target) => match target {
+                                TargetTexture::Screen => Some(&surface_texture_view),
+                                TargetTexture::Handle(texture_handle) => {
+                                    Some(&renderer.textures[texture_handle.0].view)
+                                }
+                            },
+                            None => None,
+                        };
+
+                        (&renderer.textures[texture_handle.0].view, resolve_target)
+                    }
                 };
 
                 let depth_stencil_attachment =

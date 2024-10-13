@@ -2,7 +2,9 @@ use std::{collections::HashMap, ops::Range};
 
 use crate::{
     object::Renderable,
-    renderer::{BufferHandle, Renderer, ShaderHandle, TextureHandle, UntypedBindGroupHandle},
+    renderer::{
+        BufferHandle, Renderer, ShaderHandle, TargetTexture, TextureHandle, UntypedBindGroupHandle,
+    },
     types::Vec3,
 };
 
@@ -28,9 +30,9 @@ pub struct RenderStep {
     pub(crate) shader: Option<ShaderHandle>,
     pub(crate) bind_groups: HashMap<u32, UntypedBindGroupHandle>,
 
-    pub(crate) target: Option<TextureHandle>,
+    pub(crate) target: TargetTexture,
     pub(crate) depth_tex: Option<TextureHandle>,
-    pub(crate) resolve_target: Option<TextureHandle>,
+    pub(crate) resolve_target: Option<TargetTexture>,
 
     pub(crate) alpha: f32,
     pub(crate) depth: Option<f32>,
@@ -168,11 +170,11 @@ impl<'renderer> RenderPass<'renderer> {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn with_target_texture_resolve(
         &mut self,
-        target: TextureHandle,
-        resolve: Option<TextureHandle>,
+        target: TargetTexture,
+        resolve: Option<TargetTexture>,
     ) -> &mut Self {
         let data = self.steps.last_mut().unwrap();
-        data.target = Some(target);
+        data.target = target;
         data.resolve_target = resolve;
         self
     }
