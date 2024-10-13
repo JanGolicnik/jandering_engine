@@ -149,19 +149,19 @@ impl Instance {
         self.inv_model = self.model.inverse();
     }
 
-    pub fn look_in_dir(&mut self, dir: Vec3) {
-        let rotation = Qua::from_rotation_arc(Vec3::NEG_Z, dir.normalize());
-        let (scale, _, translation) = self.model.to_scale_rotation_translation();
-        self.model = Mat4::from_scale_rotation_translation(scale, rotation, translation);
-        self.inv_model = self.model.inverse();
-    }
-
-    pub fn rotate(&mut self, angle_rad: f32, axis: Vec3) -> &mut Self {
+    pub fn rotate(mut self, angle_rad: f32, axis: Vec3) -> Self {
         let (scale, rotation, translation) = self.model.to_scale_rotation_translation();
         let new_rot = Qua::from_axis_angle(axis, angle_rad);
         self.model = Mat4::from_scale_rotation_translation(scale, rotation * new_rot, translation);
         self.inv_model = self.model.inverse();
         self
+    }
+
+    pub fn look_in_dir(&mut self, dir: Vec3) {
+        let rotation = Qua::from_rotation_arc(Vec3::NEG_Z, dir.normalize());
+        let (scale, _, translation) = self.model.to_scale_rotation_translation();
+        self.model = Mat4::from_scale_rotation_translation(scale, rotation, translation);
+        self.inv_model = self.model.inverse();
     }
 
     pub fn set_size(&mut self, size: Vec3) {
