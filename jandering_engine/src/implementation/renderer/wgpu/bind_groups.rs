@@ -12,9 +12,9 @@ use crate::{
 use super::WGPURenderer;
 
 impl WGPURenderer {
-    pub fn get_layout_descriptor<'a, T: Into<BindGroupLayoutDescriptorEntry> + Clone>(
+    pub fn get_layout_descriptor<T: Into<BindGroupLayoutDescriptorEntry> + Clone>(
         device: &wgpu::Device,
-        entries: &'a [T],
+        entries: &[T],
     ) -> wgpu::BindGroupLayout {
         let entries: Vec<_> = entries
             .iter()

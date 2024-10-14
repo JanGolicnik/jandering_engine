@@ -63,9 +63,9 @@ pub enum BindGroupLayoutEntry {
     },
 }
 
-impl Into<BindGroupLayoutDescriptorEntry> for BindGroupLayoutEntry {
-    fn into(self) -> BindGroupLayoutDescriptorEntry {
-        match self {
+impl From<BindGroupLayoutEntry> for BindGroupLayoutDescriptorEntry {
+    fn from(val: BindGroupLayoutEntry) -> Self {
+        match val {
             BindGroupLayoutEntry::Data(buffer_handle) => BindGroupLayoutDescriptorEntry::Data {
                 is_uniform: matches!(buffer_handle.buffer_type, BufferType::Uniform),
             },
