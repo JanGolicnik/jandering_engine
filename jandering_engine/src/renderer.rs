@@ -73,6 +73,7 @@ pub enum TargetTexture {
     #[default]
     Screen,
     Handle(TextureHandle),
+    None,
 }
 
 pub trait Janderer {

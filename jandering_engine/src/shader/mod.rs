@@ -55,7 +55,7 @@ pub struct ShaderDescriptor {
     pub depth: bool,
     pub stripped: bool,
     pub multisample: u32,
-    pub target_texture_format: TextureFormat,
+    pub target_texture_format: Option<TextureFormat>,
 }
 
 #[derive(Clone)]
@@ -77,7 +77,7 @@ impl Default for ShaderDescriptor {
             depth: false,
             stripped: false,
             multisample: 1,
-            target_texture_format: TextureFormat::Bgra8U,
+            target_texture_format: Some(TextureFormat::Bgra8U),
         }
     }
 }

@@ -33,22 +33,22 @@ pub fn quad_data() -> (Vec<Vertex>, Vec<u32>) {
         Vertex {
             position: Vec3::new(0.0, 0.0, 0.0),
             uv: Vec2::new(0.0, 1.0),
-            normal: Vec3::new(-1.0, -1.0, 1.0),
+            normal: Vec3::new(0.0, 0.0, -1.0),
         },
         Vertex {
             position: Vec3::new(0.0, 1.0, 0.0),
             uv: Vec2::new(0.0, 0.0),
-            normal: Vec3::new(1.0, 1.0, 1.0),
+            normal: Vec3::new(0.0, 0.0, -1.0),
         },
         Vertex {
             position: Vec3::new(1.0, 0.0, 0.0),
             uv: Vec2::new(1.0, 1.0),
-            normal: Vec3::new(1.0, -1.0, 1.0),
+            normal: Vec3::new(0.0, 0.0, -1.0),
         },
         Vertex {
             position: Vec3::new(1.0, 1.0, 0.0),
             uv: Vec2::new(1.0, 0.0),
-            normal: Vec3::new(-1.0, 1.0, 1.0),
+            normal: Vec3::new(0.0, 0.0, -1.0),
         },
     ];
 

@@ -287,31 +287,36 @@ impl Janderer for WGPURenderer {
         };
         let shader = self.device.create_shader_module(shader);
 
-        let format = match desc.target_texture_format {
-            #[cfg(target_arch = "wasm32")]
-            TextureFormat::Rgba8U => wgpu::TextureFormat::Rgba8Unorm,
-            #[cfg(target_arch = "wasm32")]
-            TextureFormat::Bgra8U => wgpu::TextureFormat::Bgra8Unorm,
-            #[cfg(not(target_arch = "wasm32"))]
-            TextureFormat::Rgba8U => wgpu::TextureFormat::Rgba8UnormSrgb,
-            #[cfg(not(target_arch = "wasm32"))]
-            TextureFormat::Bgra8U => wgpu::TextureFormat::Bgra8UnormSrgb,
-            TextureFormat::F32 => wgpu::TextureFormat::R32Float,
-            TextureFormat::Depth32F => wgpu::TextureFormat::Depth32Float,
-            TextureFormat::Depth16U => wgpu::TextureFormat::Depth16Unorm,
-        };
+        let target = match &desc.target_texture_format {
+            Some(format) => {
+                let format = match format {
+                    #[cfg(target_arch = "wasm32")]
+                    TextureFormat::Rgba8U => wgpu::TextureFormat::Rgba8Unorm,
+                    #[cfg(target_arch = "wasm32")]
+                    TextureFormat::Bgra8U => wgpu::TextureFormat::Bgra8Unorm,
+                    #[cfg(not(target_arch = "wasm32"))]
+                    TextureFormat::Rgba8U => wgpu::TextureFormat::Rgba8UnormSrgb,
+                    #[cfg(not(target_arch = "wasm32"))]
+                    TextureFormat::Bgra8U => wgpu::TextureFormat::Bgra8UnormSrgb,
+                    TextureFormat::F32 => wgpu::TextureFormat::R32Float,
+                    TextureFormat::Depth32F => wgpu::TextureFormat::Depth32Float,
+                    TextureFormat::Depth16U => wgpu::TextureFormat::Depth16Unorm,
+                };
 
-        let blend = if format == wgpu::TextureFormat::R32Float {
-            None
-        } else {
-            Some(wgpu::BlendState::ALPHA_BLENDING)
-        };
+                let blend = if format == wgpu::TextureFormat::R32Float {
+                    None
+                } else {
+                    Some(wgpu::BlendState::ALPHA_BLENDING)
+                };
 
-        let targets = &[Some(wgpu::ColorTargetState {
-            format,
-            blend,
-            write_mask: wgpu::ColorWrites::ALL,
-        })];
+                Some(wgpu::ColorTargetState {
+                    format,
+                    blend,
+                    write_mask: wgpu::ColorWrites::ALL,
+                })
+            }
+            None => None,
+        };
 
         let attributes = desc
             .descriptors
@@ -334,7 +339,7 @@ impl Janderer for WGPURenderer {
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
                     entry_point: desc.fs_entry,
-                    targets,
+                    targets: &[target],
                     compilation_options: Default::default(),
                 }),
                 primitive: wgpu::PrimitiveState {
@@ -807,21 +812,47 @@ impl WGPURenderer {
             if changed {
                 drop(render_pass);
 
-                let (view, resolve_target) = match target {
-                    TargetTexture::Screen => (&surface_texture_view, None),
-                    TargetTexture::Handle(texture_handle) => {
-                        let resolve_target = match resolve_target {
-                            Some(target) => match target {
-                                TargetTexture::Screen => Some(&surface_texture_view),
-                                TargetTexture::Handle(texture_handle) => {
-                                    Some(&renderer.textures[texture_handle.0].view)
-                                }
-                            },
-                            None => None,
+                let color_attachment = match target {
+                    TargetTexture::Screen | TargetTexture::Handle(..) => {
+                        let (view, resolve_target) = match target {
+                            TargetTexture::Screen => (&surface_texture_view, None),
+                            TargetTexture::Handle(texture_handle) => {
+                                let resolve_target = match resolve_target {
+                                    Some(target) => match target {
+                                        TargetTexture::Screen => Some(&surface_texture_view),
+                                        TargetTexture::Handle(texture_handle) => {
+                                            Some(&renderer.textures[texture_handle.0].view)
+                                        }
+                                        TargetTexture::None => None,
+                                    },
+                                    None => None,
+                                };
+
+                                (&renderer.textures[texture_handle.0].view, resolve_target)
+                            }
+                            _ => panic!(),
                         };
 
-                        (&renderer.textures[texture_handle.0].view, resolve_target)
+                        let attachment = wgpu::RenderPassColorAttachment {
+                            view,
+                            resolve_target,
+                            ops: wgpu::Operations {
+                                load: if let Some(color) = clear_color {
+                                    wgpu::LoadOp::Clear(wgpu::Color {
+                                        r: color.x as f64 * *alpha as f64,
+                                        g: color.y as f64 * *alpha as f64,
+                                        b: color.z as f64 * *alpha as f64,
+                                        a: *alpha as f64,
+                                    })
+                                } else {
+                                    wgpu::LoadOp::Load
+                                },
+                                ..Default::default()
+                            },
+                        };
+                        Some(attachment)
                     }
+                    TargetTexture::None => None,
                 };
 
                 let depth_stencil_attachment =
@@ -840,23 +871,7 @@ impl WGPURenderer {
 
                 let new_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Render Pass"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view,
-                        resolve_target,
-                        ops: wgpu::Operations {
-                            load: if let Some(color) = clear_color {
-                                wgpu::LoadOp::Clear(wgpu::Color {
-                                    r: color.x as f64 * *alpha as f64,
-                                    g: color.y as f64 * *alpha as f64,
-                                    b: color.z as f64 * *alpha as f64,
-                                    a: *alpha as f64,
-                                })
-                            } else {
-                                wgpu::LoadOp::Load
-                            },
-                            ..Default::default()
-                        },
-                    })],
+                    color_attachments: &[color_attachment],
                     depth_stencil_attachment,
                     occlusion_query_set: None,
                     timestamp_writes: None,

@@ -18,8 +18,9 @@ impl WGPURenderer {
     ) -> wgpu::BindGroupLayout {
         let entries: Vec<_> = entries
             .iter()
+            .enumerate()
             .map(
-                |e| match Into::<BindGroupLayoutDescriptorEntry>::into(e.clone()) {
+                |(i, e)| match Into::<BindGroupLayoutDescriptorEntry>::into(e.clone()) {
                     BindGroupLayoutDescriptorEntry::Data { is_uniform, .. } => {
                         let ty = wgpu::BindingType::Buffer {
                             ty: if is_uniform {
@@ -32,7 +33,7 @@ impl WGPURenderer {
                         };
 
                         wgpu::BindGroupLayoutEntry {
-                            binding: 0,
+                            binding: i as u32,
                             visibility: wgpu::ShaderStages::COMPUTE
                                 | wgpu::ShaderStages::VERTEX
                                 | wgpu::ShaderStages::FRAGMENT,
@@ -42,7 +43,7 @@ impl WGPURenderer {
                     }
                     BindGroupLayoutDescriptorEntry::Texture { sample_type, .. } => {
                         wgpu::BindGroupLayoutEntry {
-                            binding: 0,
+                            binding: i as u32,
                             visibility: wgpu::ShaderStages::COMPUTE
                                 | wgpu::ShaderStages::VERTEX
                                 | wgpu::ShaderStages::FRAGMENT,
@@ -66,7 +67,7 @@ impl WGPURenderer {
                     }
                     BindGroupLayoutDescriptorEntry::Sampler { sampler_type, .. } => {
                         wgpu::BindGroupLayoutEntry {
-                            binding: 1,
+                            binding: i as u32,
                             visibility: wgpu::ShaderStages::COMPUTE
                                 | wgpu::ShaderStages::VERTEX
                                 | wgpu::ShaderStages::FRAGMENT,
