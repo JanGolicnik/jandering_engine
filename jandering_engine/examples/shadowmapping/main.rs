@@ -1,9 +1,9 @@
 use std::f32::consts::PI;
 
 use jandering_engine::{
-    bind_group::camera::free::MatrixCamera,
     engine::Engine,
     object::{Instance, Object, Vertex},
+    render_pass::RenderPass,
     renderer::{Janderer, Renderer, TargetTexture},
     shader::ShaderDescriptor,
     texture::{
@@ -11,6 +11,7 @@ use jandering_engine::{
         TextureDescriptor, TextureFormat,
     },
     types::{UVec2, Vec2, Vec3},
+    utils::free_camera::MatrixCamera,
     window::{
         Events, InputState, Key, MouseButton, WindowConfig, WindowEvent, WindowManagerTrait,
         WindowTrait,
@@ -124,8 +125,8 @@ fn main() {
 
     let mut camera = MatrixCamera::new(renderer);
     // let mut camera = MatrixCamera::with_controller(renderer, FreeCameraController::default());
-    *camera.position_mut() = Vec3::new(70.0, 30.0, 70.0);
-    *camera.direction_mut() = -camera.position().normalize();
+    camera.set_position(Vec3::new(70.0, 30.0, 70.0));
+    camera.set_direction(-camera.position().normalize());
 
     // let shader_source = pollster::block_on(load_text(jandering_engine::utils::FilePath::FileName(
     //     "shader.wgsl",
@@ -139,19 +140,17 @@ fn main() {
     // .unwrap();
     let light_shader_source = include_str!("light_shader.wgsl").to_string();
 
-    let shader = renderer.create_shader(
-        ShaderDescriptor::default()
-            .with_source(jandering_engine::shader::ShaderSource::Code(
-                shader_source.clone(),
-            ))
-            .with_descriptors(vec![Vertex::desc(), Instance::desc()])
-            .with_bind_group_layout_descriptors(vec![
-                Light::get_layout_descriptor(),
-                camera.get_layout_descriptor(),
-            ])
-            .with_depth(true)
-            .with_backface_culling(false),
-    );
+    let shader = renderer.create_shader(ShaderDescriptor {
+        source: jandering_engine::shader::ShaderSource::Code(shader_source.clone()),
+        descriptors: vec![Vertex::desc(), Instance::desc()],
+        bind_group_layout_descriptors: vec![
+            Light::get_layout_descriptor(),
+            camera.get_layout_descriptor(),
+        ],
+        backface_culling: false,
+        depth: true,
+        ..Default::default()
+    });
 
     let light_shader = renderer.create_shader(ShaderDescriptor {
         source: jandering_engine::shader::ShaderSource::Code(light_shader_source.clone()),
@@ -286,15 +285,17 @@ fn main() {
         ship.update(mouse_floor, &events, renderer, dt);
 
         if window.is_initialized() {
-            let mut pass = renderer.new_pass(&mut window);
-            pass.with_depth(light.texture(), Some(1.0))
+            let pass = RenderPass::new(&mut window)
+                .with_depth(light.texture(), Some(1.0))
                 .with_clear_color(0.0, 0.0, 0.0)
                 .with_target_texture_resolve(TargetTexture::None, None)
                 .set_shader(light_shader)
                 .bind(0, light.data_only_bind_group())
                 .bind(1, camera.bind_group())
                 .render(&[&ship.mesh, &floor]);
-            pass.with_depth(depth_texture, Some(1.0))
+            renderer.submit_pass(pass);
+            let pass = RenderPass::new(&mut window)
+                .with_depth(depth_texture, Some(1.0))
                 .with_target_texture_resolve(
                     jandering_engine::renderer::TargetTexture::Screen,
                     None,
@@ -304,13 +305,15 @@ fn main() {
                 .bind(1, camera.bind_group())
                 .set_shader(shader)
                 .render(&[&ship.mesh, &floor]);
+            renderer.submit_pass(pass);
             if show_shadow_camera_view {
-                pass.without_depth()
+                let pass = RenderPass::new(&mut window)
+                    .without_depth()
                     .set_shader(popr_shader)
                     .bind(0, light.bind_group())
                     .render(&[&fullscreen_quad]);
+                renderer.submit_pass(pass);
             }
-            pass.submit();
         }
 
         window.request_redraw();

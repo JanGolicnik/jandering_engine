@@ -5,6 +5,10 @@ use crate::{
     types::{Vec2, Vec3},
 };
 
+pub mod d2_camera;
+pub mod free_camera;
+pub mod texture;
+
 pub const SQRT_3: f32 = 1.732_050_8;
 
 #[derive(Clone)]

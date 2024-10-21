@@ -1,8 +1,7 @@
 use jandering_engine::{
     bind_group::{
-        camera::free::constants::OPENGL_TO_WGPU_MATRIX, BindGroup, BindGroupLayout,
-        BindGroupLayoutDescriptor, BindGroupLayoutDescriptorEntry, BindGroupLayoutEntry,
-        SamplerType,
+        BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutDescriptorEntry,
+        BindGroupLayoutEntry, SamplerType,
     },
     renderer::{
         BindGroupHandle, BufferHandle, Janderer, Renderer, SamplerHandle, TextureHandle,
@@ -10,6 +9,7 @@ use jandering_engine::{
     },
     texture::{sampler::SamplerDescriptor, texture_usage, TextureDescriptor, TextureFormat},
     types::{Mat4, UVec2, Vec3},
+    utils::free_camera::OPENGL_TO_WGPU_MATRIX,
 };
 
 const LIGHT_RESOLUTION: u32 = 2048;

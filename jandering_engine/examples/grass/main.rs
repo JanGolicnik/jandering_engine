@@ -2,17 +2,20 @@ use grass_object::GrassObject;
 use image::GenericImageView;
 use jandering_engine::{
     bind_group::{
-        camera::free::{FreeCameraController, MatrixCamera},
-        texture::TextureBindGroup,
         BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutDescriptorEntry,
         BindGroupLayoutEntry,
     },
     engine::Engine,
     object::{Instance, Object, Vertex},
+    render_pass::RenderPass,
     renderer::{BufferHandle, Janderer, Renderer},
     shader::{ShaderDescriptor, ShaderSource},
     texture::{sampler::SamplerDescriptor, texture_usage, TextureDescriptor, TextureFormat},
     types::{UVec2, Vec3},
+    utils::{
+        free_camera::{FreeCameraController, MatrixCamera},
+        texture::TextureBindGroup,
+    },
 };
 use je_windowing::{Key, WindowConfig, WindowEvent, WindowManagerTrait, WindowTrait};
 use star_object::StarObject;
@@ -170,57 +173,51 @@ fn main() {
         ..Default::default()
     });
 
-    let grass_shader = renderer.create_shader(
-        ShaderDescriptor::default()
-            .with_descriptors(vec![Vertex::desc()])
-            .with_bind_group_layout_descriptors(vec![
-                camera.get_layout_descriptor(),
-                render_data_bind_group_layout.clone(),
-                TextureBindGroup::get_layout_descriptor(),
-                TextureBindGroup::get_layout_descriptor(),
-            ])
-            .with_depth(true)
-            .with_backface_culling(false)
-            .with_multisample(MULTISAMPLE)
-            .with_source(ShaderSource::Code(
-                include_str!("terrain_shader.wgsl").to_string(),
-            ))
-            .with_fs_entry("fs_grass")
-            .with_vs_entry("vs_grass"),
-    );
+    let grass_shader = renderer.create_shader(ShaderDescriptor {
+        source: ShaderSource::Code(include_str!("terrain_shader.wgsl").to_string()),
+        descriptors: vec![Vertex::desc()],
+        bind_group_layout_descriptors: vec![
+            camera.get_layout_descriptor(),
+            render_data_bind_group_layout.clone(),
+            TextureBindGroup::get_layout_descriptor(),
+            TextureBindGroup::get_layout_descriptor(),
+        ],
+        vs_entry: "fs_grass",
+        fs_entry: "vs_grass",
+        backface_culling: false,
+        depth: true,
+        multisample: MULTISAMPLE,
+        ..Default::default()
+    });
 
-    let ground_shader = renderer.create_shader(
-        ShaderDescriptor::default()
-            .with_descriptors(vec![Vertex::desc(), Instance::desc()])
-            .with_bind_group_layout_descriptors(vec![
-                camera.get_layout_descriptor(),
-                render_data_bind_group_layout.clone(),
-                TextureBindGroup::get_layout_descriptor(),
-            ])
-            .with_backface_culling(false)
-            .with_depth(true)
-            .with_multisample(MULTISAMPLE)
-            .with_source(ShaderSource::Code(
-                include_str!("terrain_shader.wgsl").to_string(),
-            ))
-            .with_fs_entry("fs_ground")
-            .with_vs_entry("vs_ground"),
-    );
+    let ground_shader = renderer.create_shader(ShaderDescriptor {
+        source: ShaderSource::Code(include_str!("terrain_shader.wgsl").to_string()),
+        descriptors: vec![Vertex::desc(), Instance::desc()],
+        bind_group_layout_descriptors: vec![
+            camera.get_layout_descriptor(),
+            render_data_bind_group_layout.clone(),
+            TextureBindGroup::get_layout_descriptor(),
+        ],
+        vs_entry: "fs_ground",
+        fs_entry: "fs_ground",
+        backface_culling: false,
+        depth: true,
+        multisample: MULTISAMPLE,
+        ..Default::default()
+    });
 
-    let star_shader = renderer.create_shader(
-        ShaderDescriptor::default()
-            .with_descriptors(vec![Vertex::desc()])
-            .with_bind_group_layout_descriptors(vec![
-                camera.get_layout_descriptor(),
-                render_data_bind_group_layout.clone(),
-            ])
-            .with_backface_culling(true)
-            .with_depth(true)
-            .with_multisample(MULTISAMPLE)
-            .with_source(ShaderSource::Code(
-                include_str!("star_shader.wgsl").to_string(),
-            )),
-    );
+    let star_shader = renderer.create_shader(ShaderDescriptor {
+        source: ShaderSource::Code(include_str!("star_shader.wgsl").to_string()),
+        descriptors: vec![Vertex::desc()],
+        bind_group_layout_descriptors: vec![
+            camera.get_layout_descriptor(),
+            render_data_bind_group_layout.clone(),
+        ],
+        backface_culling: true,
+        depth: false,
+        multisample: MULTISAMPLE,
+        ..Default::default()
+    });
 
     let render_data_handle = renderer.create_typed_bind_group(render_data);
 
@@ -322,7 +319,7 @@ fn main() {
         }
 
         if events.is_pressed(Key::B) {
-            renderer.re_create_shaders();
+            renderer.reload_shaders();
         }
 
         if window.is_initialized() {
@@ -339,8 +336,8 @@ fn main() {
                 bytemuck::cast_slice(&[render_data.data]),
             );
 
-            let mut pass = renderer.new_pass(&mut window);
-            pass.set_shader(star_shader)
+            let pass = RenderPass::new(&mut window)
+                .set_shader(star_shader)
                 .with_target_texture_resolve(
                     jandering_engine::renderer::TargetTexture::Handle(multisample_texture),
                     None,
@@ -356,7 +353,7 @@ fn main() {
                 .set_shader(grass_shader)
                 .bind(3, noise_texture.into())
                 .render(&[&grass_lod2]);
-            pass.submit();
+            renderer.submit_pass(pass);
 
             let render_data = renderer
                 .get_typed_bind_group_mut(render_data_handle)
@@ -369,8 +366,8 @@ fn main() {
                 bytemuck::cast_slice(&[render_data.data]),
             );
 
-            let mut pass = renderer.new_pass(&mut window);
-            pass.set_shader(grass_shader)
+            let pass = RenderPass::new(&mut window)
+                .set_shader(grass_shader)
                 .with_depth(depth_texture, None)
                 .with_target_texture_resolve(
                     jandering_engine::renderer::TargetTexture::Handle(multisample_texture),
@@ -381,7 +378,7 @@ fn main() {
                 .bind(2, heightmap_texture.into())
                 .bind(3, noise_texture.into())
                 .render(&[&grass_lod1]);
-            pass.submit();
+            renderer.submit_pass(pass);
         }
 
         window.request_redraw();

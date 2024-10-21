@@ -4,6 +4,7 @@ use jandering_engine::{
 };
 
 pub struct StarObject {
+    #[allow(dead_code)]
     pub vertices: Vec<Vertex>,
     //
     pub indices: Vec<u32>,

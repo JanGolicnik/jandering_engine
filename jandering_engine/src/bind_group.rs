@@ -4,10 +4,6 @@ use crate::renderer::{BufferHandle, BufferType};
 
 use super::renderer::{SamplerHandle, TextureHandle};
 
-pub mod camera;
-pub mod resolution;
-pub mod texture;
-
 pub trait BindGroup: Any + BindGroupToAny {
     fn get_layout_descriptor() -> BindGroupLayoutDescriptor
     where

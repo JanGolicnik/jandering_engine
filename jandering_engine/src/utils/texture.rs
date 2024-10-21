@@ -1,6 +1,9 @@
 use crate::renderer::{Renderer, SamplerHandle, TextureHandle};
 
-use super::{BindGroup, BindGroupLayout, BindGroupLayoutEntry, SamplerType};
+use crate::bind_group::{
+    BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutDescriptorEntry,
+    BindGroupLayoutEntry, SamplerType, TextureSampleType,
+};
 
 pub struct TextureBindGroup {
     pub texture_handle: TextureHandle,
@@ -13,7 +16,7 @@ impl BindGroup for TextureBindGroup {
             entries: vec![
                 BindGroupLayoutEntry::Texture {
                     handle: self.texture_handle,
-                    sample_type: super::TextureSampleType::default(),
+                    sample_type: TextureSampleType::default(),
                 },
                 BindGroupLayoutEntry::Sampler {
                     handle: self.sampler_handle,
@@ -23,16 +26,16 @@ impl BindGroup for TextureBindGroup {
         }
     }
 
-    fn get_layout_descriptor() -> super::BindGroupLayoutDescriptor
+    fn get_layout_descriptor() -> BindGroupLayoutDescriptor
     where
         Self: Sized,
     {
-        super::BindGroupLayoutDescriptor {
+        BindGroupLayoutDescriptor {
             entries: vec![
-                super::BindGroupLayoutDescriptorEntry::Texture {
+                BindGroupLayoutDescriptorEntry::Texture {
                     sample_type: Default::default(),
                 },
-                super::BindGroupLayoutDescriptorEntry::Sampler {
+                BindGroupLayoutDescriptorEntry::Sampler {
                     sampler_type: SamplerType::Filtering,
                 },
             ],
@@ -64,7 +67,7 @@ impl BindGroup for UnfilteredTextureBindGroup {
             entries: vec![
                 BindGroupLayoutEntry::Texture {
                     handle: self.texture_handle,
-                    sample_type: super::TextureSampleType::NonFilterable,
+                    sample_type: TextureSampleType::NonFilterable,
                 },
                 BindGroupLayoutEntry::Sampler {
                     handle: self.sampler_handle,
@@ -74,16 +77,16 @@ impl BindGroup for UnfilteredTextureBindGroup {
         }
     }
 
-    fn get_layout_descriptor() -> super::BindGroupLayoutDescriptor
+    fn get_layout_descriptor() -> BindGroupLayoutDescriptor
     where
         Self: Sized,
     {
-        super::BindGroupLayoutDescriptor {
+        BindGroupLayoutDescriptor {
             entries: vec![
-                super::BindGroupLayoutDescriptorEntry::Texture {
-                    sample_type: super::TextureSampleType::NonFilterable,
+                BindGroupLayoutDescriptorEntry::Texture {
+                    sample_type: TextureSampleType::NonFilterable,
                 },
-                super::BindGroupLayoutDescriptorEntry::Sampler {
+                BindGroupLayoutDescriptorEntry::Sampler {
                     sampler_type: SamplerType::NonFiltering,
                 },
             ],

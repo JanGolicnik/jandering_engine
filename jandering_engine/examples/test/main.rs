@@ -1,10 +1,7 @@
 use jandering_engine::{
-    bind_group::{
-        camera::free::{FreeCameraController, MatrixCameraBindGroup},
-        BindGroup,
-    },
     engine::Engine,
     object::{Instance, Object, Vertex},
+    render_pass::RenderPass,
     renderer::Janderer,
     shader::ShaderDescriptor,
     texture::{
@@ -12,6 +9,7 @@ use jandering_engine::{
         TextureDescriptor, TextureFormat,
     },
     types::{UVec2, Vec3},
+    utils::free_camera::{FreeCameraController, MatrixCamera},
     window::{WindowConfig, WindowEvent, WindowManagerTrait, WindowTrait},
 };
 
@@ -37,19 +35,16 @@ fn main() {
 
     let renderer = &mut engine.renderer;
 
-    let mut camera =
-        MatrixCameraBindGroup::with_controller(renderer, FreeCameraController::default());
+    let mut camera = MatrixCamera::with_controller(renderer, FreeCameraController::default());
     camera.make_perspective(CAMERA_FOV, 1.0, CAMEREA_NEAR, CAMEREA_FAR);
 
-    let shader = renderer.create_shader(
-        ShaderDescriptor::default()
-            .with_descriptors(vec![Vertex::desc(), Instance::desc()])
-            .with_bind_group_layouts(vec![camera.get_layout()])
-            .with_depth(true)
-            .with_backface_culling(false),
-    );
-
-    let camera_handle = renderer.create_typed_bind_group(camera);
+    let shader = renderer.create_shader(ShaderDescriptor {
+        descriptors: vec![Vertex::desc(), Instance::desc()],
+        bind_group_layout_descriptors: vec![camera.get_layout_descriptor()],
+        backface_culling: true,
+        depth: true,
+        ..Default::default()
+    });
 
     const COUNT: i32 = 1;
     let mut cube_instance_grid = Vec::new();
@@ -97,7 +92,6 @@ fn main() {
         {
             let resolution = window.size();
 
-            let camera = renderer.get_typed_bind_group_mut(camera_handle).unwrap();
             camera.make_perspective(
                 CAMERA_FOV,
                 resolution.0 as f32 / resolution.1 as f32,
@@ -121,8 +115,7 @@ fn main() {
 
         cube.update(renderer);
 
-        let camera = renderer.get_typed_bind_group_mut(camera_handle).unwrap();
-        camera.update(window.events(), dt);
+        camera.update(renderer, window.events(), dt);
 
         if window.is_initialized() {
             // dbg!("rendering");
@@ -130,16 +123,13 @@ fn main() {
             // pass.with_clear_color(0.4, 0.7, 1.0).render_empty();
             // pass.submit();
 
-            let data = camera.get_data();
-            renderer.write_bind_group(camera_handle.into(), &data);
-
-            let mut pass = renderer.new_pass(&mut window);
-            pass.with_depth(depth_texture, Some(1.0))
+            let pass = RenderPass::new(&mut window)
+                .with_depth(depth_texture, Some(1.0))
                 .with_alpha(0.0)
                 .set_shader(shader)
-                .bind(0, camera_handle.into())
+                .bind(0, camera.bind_group())
                 .render(&[&cube]);
-            pass.submit();
+            renderer.submit_pass(pass);
         }
 
         window.request_redraw();

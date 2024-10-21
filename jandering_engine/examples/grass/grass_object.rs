@@ -1,9 +1,11 @@
 use jandering_engine::{
-    object::{Renderable, Vertex}, renderer::{BufferHandle, Janderer, Renderer},
+    object::{Renderable, Vertex},
+    renderer::{BufferHandle, Janderer, Renderer},
     utils::load_obj,
 };
 
 pub struct GrassObject {
+    #[allow(dead_code)]
     pub vertices: Vec<Vertex>,
     //
     pub indices: Vec<u32>,
