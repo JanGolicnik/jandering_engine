@@ -1,3 +1,5 @@
+use primitives::plane_data;
+
 use crate::{
     renderer::{BufferHandle, Janderer},
     shader::BufferLayoutEntryDataType,
@@ -269,6 +271,14 @@ impl<T: bytemuck::Pod> Object<T> {
         T: bytemuck::Pod,
     {
         let (vertices, indices) = quad_data();
+        Self::new(renderer, vertices, indices, instances)
+    }
+
+    pub fn plane(renderer: &mut Renderer, subdivisions: u32, instances: Vec<T>) -> Self
+    where
+        T: bytemuck::Pod,
+    {
+        let (vertices, indices) = plane_data(subdivisions);
         Self::new(renderer, vertices, indices, instances)
     }
 }

@@ -1,8 +1,10 @@
-use crate::{bind_group::BindGroupLayoutDescriptor, texture::TextureFormat};
+use crate::{bind_group::BindGroupLayoutDescriptor, texture::TextureFormat, utils::FilePath};
 
 #[derive(Clone)]
 pub enum ShaderSource {
     Code(String),
+    #[cfg(not(target_arch = "wasm32"))]
+    File(FilePath),
 }
 
 #[derive(Clone)]
@@ -46,6 +48,7 @@ pub struct BufferLayout {
 
 #[derive(Clone)]
 pub struct ShaderDescriptor {
+    pub name: &'static str,
     pub source: ShaderSource,
     pub descriptors: Vec<BufferLayout>,
     pub bind_group_layout_descriptors: Vec<BindGroupLayoutDescriptor>,
@@ -68,6 +71,7 @@ pub struct ComputeShaderDescriptor {
 impl Default for ShaderDescriptor {
     fn default() -> Self {
         Self {
+            name: "Unnamed Shader",
             source: ShaderSource::Code(include_str!("default_shader.wgsl").to_string()),
             descriptors: Vec::new(),
             bind_group_layout_descriptors: Vec::new(),
@@ -88,56 +92,5 @@ impl ShaderDescriptor {
             source: ShaderSource::Code(include_str!("flat_shader.wgsl").to_string()),
             ..Default::default()
         }
-    }
-}
-
-impl ShaderDescriptor {
-    pub fn with_descriptors(mut self, descriptors: Vec<BufferLayout>) -> Self {
-        self.descriptors = descriptors;
-        self
-    }
-
-    pub fn with_backface_culling(mut self, value: bool) -> Self {
-        self.backface_culling = value;
-        self
-    }
-
-    pub fn with_bind_group_layout_descriptors(
-        mut self,
-        layouts: Vec<BindGroupLayoutDescriptor>,
-    ) -> Self {
-        self.bind_group_layout_descriptors = layouts;
-        self
-    }
-
-    pub fn with_depth(mut self, value: bool) -> Self {
-        self.depth = value;
-        self
-    }
-
-    pub fn with_vs_entry(mut self, entry: &'static str) -> Self {
-        self.vs_entry = entry;
-        self
-    }
-
-    pub fn with_fs_entry(mut self, entry: &'static str) -> Self {
-        self.fs_entry = entry;
-        self
-    }
-
-    pub fn with_source(mut self, source: ShaderSource) -> Self {
-        self.source = source;
-        self
-    }
-
-    pub fn with_stripping(mut self, value: bool) -> Self {
-        self.stripped = value;
-        self
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn with_multisample(mut self, value: u32) -> Self {
-        self.multisample = value;
-        self
     }
 }

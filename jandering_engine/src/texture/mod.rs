@@ -45,7 +45,7 @@ impl<'data> Default for TextureDescriptor<'data> {
     fn default() -> Self {
         Self {
             name: "texture",
-            size: UVec2::new(0, 0),
+            size: UVec2::new(8, 8),
             sample_count: 1,
             format: TextureFormat::Bgra8U,
             data: None,

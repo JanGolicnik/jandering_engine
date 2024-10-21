@@ -46,6 +46,7 @@ pub struct FreeCameraController {
 pub trait CameraController {
     fn event(&mut self, event: WindowEvent);
     fn update(&mut self, position: &mut Vec3, direction: &mut Vec3, dt: f32);
+    fn set_direction(&mut self, _direction: Vec3) {}
 }
 
 struct MatrixCameraBindGroup {
@@ -56,7 +57,7 @@ pub struct MatrixCamera {
     bind_group: BindGroupHandle<MatrixCameraBindGroup>,
     data: CameraData,
     proj: Mat4,
-    pub controller: Option<Box<dyn CameraController>>,
+    controller: Option<Box<dyn CameraController>>,
 }
 
 impl std::fmt::Debug for MatrixCamera {
@@ -169,20 +170,30 @@ impl MatrixCamera {
         let bind_group = renderer.get_typed_bind_group(self.bind_group).unwrap();
         renderer.write_buffer(bind_group.buffer_handle, bytemuck::cast_slice(&[self.data]));
     }
-    pub fn attach_controller(&mut self, controller: Box<dyn CameraController>) -> &mut Self {
+
+    pub fn attach_controller(&mut self, mut controller: Box<dyn CameraController>) -> &mut Self {
+        controller.set_direction(self.direction());
         self.controller = Some(controller);
         self
     }
 
-    pub fn position_mut(&mut self) -> &mut Vec3 {
-        &mut self.data.position
+    pub fn take_controller(&mut self) -> Option<Box<dyn CameraController>> {
+        self.controller.take()
     }
+
+    pub fn set_position(&mut self, pos: Vec3) {
+        self.data.position = pos;
+    }
+
     pub fn position(&self) -> Vec3 {
         self.data.position
     }
 
-    pub fn direction_mut(&mut self) -> &mut Vec3 {
-        &mut self.data.direction
+    pub fn set_direction(&mut self, direction: Vec3) {
+        self.data.direction = direction;
+        if let Some(controller) = &mut self.controller {
+            controller.set_direction(direction);
+        }
     }
     pub fn direction(&self) -> Vec3 {
         self.data.direction
@@ -303,5 +314,16 @@ impl CameraController for FreeCameraController {
         *object_position += velocity.x * object_direction.cross(Vec3::Y) * dt;
 
         self.velocity += -self.velocity * (dt * 6.0);
+    }
+
+    fn set_direction(&mut self, direction: Vec3) {
+        let length = direction.length();
+        self.pitch = (direction.y / length).asin().to_degrees();
+        let cos_pitch = self.pitch.cos();
+        if cos_pitch != 0.0 {
+            self.yaw = (direction.x / (cos_pitch * length)).asin().to_degrees();
+        } else {
+            self.yaw = 0.0;
+        }
     }
 }

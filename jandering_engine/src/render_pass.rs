@@ -2,9 +2,7 @@ use std::{collections::HashMap, ops::Range};
 
 use crate::{
     object::Renderable,
-    renderer::{
-        BufferHandle, Renderer, ShaderHandle, TargetTexture, TextureHandle, UntypedBindGroupHandle,
-    },
+    renderer::{BufferHandle, ShaderHandle, TargetTexture, TextureHandle, UntypedBindGroupHandle},
     types::Vec3,
 };
 
@@ -56,21 +54,19 @@ impl Default for RenderStep {
 }
 
 pub struct RenderPass<'renderer> {
-    pub(crate) renderer: &'renderer mut Renderer,
-    pub(crate) window: &'renderer mut Window,
-    pub(crate) steps: Vec<RenderStep>,
+    pub window: &'renderer mut Window,
+    pub steps: Vec<RenderStep>,
 }
 
 impl<'renderer> RenderPass<'renderer> {
-    pub fn new(renderer: &'renderer mut Renderer, window: &'renderer mut Window) -> Self {
+    pub fn new(window: &'renderer mut Window) -> Self {
         Self {
-            renderer,
             window,
             steps: vec![RenderStep::default()],
         }
     }
 
-    pub fn render_empty(&mut self) -> &mut Self {
+    pub fn render_empty(mut self) -> Self {
         let step = self.steps.last_mut().unwrap();
         step.action = RenderAction::Empty;
         let mut next_step = step.clone();
@@ -81,19 +77,19 @@ impl<'renderer> RenderPass<'renderer> {
         self
     }
 
-    pub fn render(&mut self, renderables: &[&impl Renderable]) -> &mut Self {
+    pub fn render(mut self, renderables: &[&impl Renderable]) -> Self {
         for renderable in renderables {
-            self.render_range(*renderable, 0..renderable.num_instances());
+            self = self.render_range(*renderable, 0..renderable.num_instances());
         }
         self
     }
 
-    pub fn render_one(&mut self, renderable: &impl Renderable) -> &mut Self {
+    pub fn render_one(self, renderable: &impl Renderable) -> Self {
         let range = 0..renderable.num_instances();
         self.render_range(renderable, range)
     }
 
-    pub fn render_range(&mut self, renderable: &impl Renderable, range: Range<u32>) -> &mut Self {
+    pub fn render_range(mut self, renderable: &impl Renderable, range: Range<u32>) -> Self {
         let step = self.steps.last_mut().unwrap();
         let (vertex_buffer_handle, index_buffer_handle, instance_buffer_handle) =
             renderable.get_buffers();
@@ -113,7 +109,7 @@ impl<'renderer> RenderPass<'renderer> {
         self
     }
 
-    pub fn bind(&mut self, slot: u32, bind_group: UntypedBindGroupHandle) -> &mut Self {
+    pub fn bind(mut self, slot: u32, bind_group: UntypedBindGroupHandle) -> Self {
         self.steps
             .last_mut()
             .unwrap()
@@ -124,40 +120,36 @@ impl<'renderer> RenderPass<'renderer> {
         self
     }
 
-    pub fn unbind(&mut self, slot: u32) -> &mut Self {
+    pub fn unbind(mut self, slot: u32) -> Self {
         self.steps.last_mut().unwrap().bind_groups.remove(&slot);
         self
     }
 
-    pub fn submit(self) {
-        Renderer::submit_pass(self);
-    }
-
-    pub fn set_shader(&mut self, shader: ShaderHandle) -> &mut Self {
+    pub fn set_shader(mut self, shader: ShaderHandle) -> Self {
         self.steps.last_mut().unwrap().shader = Some(shader);
         self
     }
 
-    pub fn with_depth(&mut self, texture: TextureHandle, value: Option<f32>) -> &mut Self {
+    pub fn with_depth(mut self, texture: TextureHandle, value: Option<f32>) -> Self {
         let data = self.steps.last_mut().unwrap();
         data.depth_tex = Some(texture);
         data.depth = value;
         self
     }
 
-    pub fn without_depth(&mut self) -> &mut Self {
+    pub fn without_depth(mut self) -> Self {
         let data = self.steps.last_mut().unwrap();
         data.depth_tex = None;
         data.depth = None;
         self
     }
 
-    pub fn with_clear_color(&mut self, r: f32, g: f32, b: f32) -> &mut Self {
+    pub fn with_clear_color(mut self, r: f32, g: f32, b: f32) -> Self {
         self.steps.last_mut().unwrap().clear_color = Some(Vec3::new(r, g, b));
         self
     }
 
-    pub fn with_alpha(&mut self, alpha: f32) -> &mut Self {
+    pub fn with_alpha(mut self, alpha: f32) -> Self {
         let data = self.steps.last_mut().unwrap();
         data.alpha = alpha;
         if data.clear_color.is_none() {
@@ -169,10 +161,10 @@ impl<'renderer> RenderPass<'renderer> {
     //  None for resolve target means use canvas
     #[cfg(not(target_arch = "wasm32"))]
     pub fn with_target_texture_resolve(
-        &mut self,
+        mut self,
         target: TargetTexture,
         resolve: Option<TargetTexture>,
-    ) -> &mut Self {
+    ) -> Self {
         let data = self.steps.last_mut().unwrap();
         data.target = target;
         data.resolve_target = resolve;

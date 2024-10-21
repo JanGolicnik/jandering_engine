@@ -57,6 +57,41 @@ pub fn quad_data() -> (Vec<Vertex>, Vec<u32>) {
     (vertices, indices)
 }
 
+pub fn plane_data(subdivisions: u32) -> (Vec<Vertex>, Vec<u32>) {
+    let n_faces_side = 2u32.pow(subdivisions);
+    let n_vertices_side = n_faces_side + 1;
+    let mut vertices = Vec::with_capacity((n_vertices_side * n_vertices_side) as usize);
+
+    for y in 0..n_vertices_side {
+        for x in 0..n_vertices_side {
+            let uv = Vec2::new(
+                x as f32 / (n_vertices_side - 1) as f32,
+                y as f32 / (n_vertices_side - 1) as f32,
+            );
+            vertices.push(Vertex {
+                position: uv.extend(0.0),
+                normal: Vec3::NEG_Z,
+                uv,
+            });
+        }
+    }
+
+    let mut indices = Vec::new();
+
+    for y in 0..n_faces_side {
+        for x in 0..n_faces_side {
+            indices.push(x + y * n_vertices_side);
+            indices.push(x + (y + 1) * n_vertices_side);
+            indices.push(x + y * n_vertices_side + 1);
+            indices.push(x + y * n_vertices_side + 1);
+            indices.push(x + (y + 1) * n_vertices_side);
+            indices.push(x + (y + 1) * n_vertices_side + 1);
+        }
+    }
+
+    (vertices, indices)
+}
+
 // pub fn circle<T>(renderer: &Renderer, instances: Vec<T>, resolution: u32) -> Object<T>
 // where
 //     T: bytemuck::Pod,

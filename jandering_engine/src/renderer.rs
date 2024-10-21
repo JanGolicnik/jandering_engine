@@ -86,9 +86,9 @@ pub trait Janderer {
     fn resize(&mut self, window: &Window, width: u32, height: u32);
 
     // rendering
-    fn new_pass<'a>(&'a mut self, window: &'a mut Window) -> RenderPass;
-
     fn new_compute_pass(&mut self) -> ComputePass;
+
+    fn submit_pass(&mut self, pass: RenderPass);
 
     fn present(&mut self);
 
@@ -110,9 +110,9 @@ pub trait Janderer {
 
     fn create_shader(&mut self, desc: ShaderDescriptor) -> ShaderHandle;
 
-    fn re_create_shader(&mut self, handle: ShaderHandle);
+    fn reload_shader(&mut self, handle: ShaderHandle);
 
-    fn re_create_shaders(&mut self);
+    fn reload_shaders(&mut self);
 
     // compute
     fn create_compute_shader_at(

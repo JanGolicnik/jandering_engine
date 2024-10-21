@@ -8,8 +8,8 @@ use crate::{
 pub const SQRT_3: f32 = 1.732_050_8;
 
 #[derive(Clone)]
-pub enum FilePath<'a> {
-    FileName(&'a str),
+pub enum FilePath {
+    FileName(&'static str),
     AbsolutePath(PathBuf),
 }
 
@@ -24,7 +24,7 @@ fn format_url(file_name: &str) -> reqwest::Url {
     base.join(file_name).unwrap()
 }
 
-pub async fn load_binary(file: FilePath<'_>) -> anyhow::Result<Vec<u8>> {
+pub async fn load_binary(file: FilePath) -> anyhow::Result<Vec<u8>> {
     cfg_if::cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
             match file {
@@ -49,7 +49,7 @@ pub async fn load_binary(file: FilePath<'_>) -> anyhow::Result<Vec<u8>> {
     }
 }
 
-pub async fn load_text(file: FilePath<'_>) -> anyhow::Result<String> {
+pub async fn load_text(file: FilePath) -> anyhow::Result<String> {
     cfg_if::cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
             match file {

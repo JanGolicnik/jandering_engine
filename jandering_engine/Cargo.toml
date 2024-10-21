@@ -31,6 +31,7 @@ anyhow = "1.0.79"
 glam = { version = "0.25.0", features = ["bytemuck"]}
 wgpu = "22.1.0"
 je_windowing = { path = "../je_windowing" }
+notify = "6.1.1"
 
 [dependencies.windows]
 version = "0.57"
