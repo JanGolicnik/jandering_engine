@@ -159,8 +159,12 @@ impl Instance {
         self
     }
 
-    pub fn look_in_dir(&mut self, dir: Vec3) {
-        let rotation = Qua::from_rotation_arc(Vec3::NEG_Z, dir.normalize());
+    pub fn look_in_dir(&mut self, mut dir: Vec3) {
+        dir = dir.normalize();
+        let right = Vec3::Y.cross(dir).normalize();
+        let recalculated_up = dir.cross(right);
+        let rotation_matrix = Mat3::from_cols(right, recalculated_up, dir);
+        let rotation = Qua::from_mat3(&rotation_matrix);
         let (scale, _, translation) = self.model.to_scale_rotation_translation();
         self.model = Mat4::from_scale_rotation_translation(scale, rotation, translation);
         self.inv_model = self.model.inverse();

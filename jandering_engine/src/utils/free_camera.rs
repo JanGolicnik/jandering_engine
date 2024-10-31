@@ -63,6 +63,7 @@ pub trait CameraController {
     fn event(&mut self, event: WindowEvent);
     fn update(&mut self, position: &mut Vec3, direction: &mut Vec3, dt: f32);
     fn set_direction(&mut self, _direction: Vec3) {}
+    fn clear_mouse_pos(&mut self);
 }
 
 struct MatrixCameraBindGroup {
@@ -341,5 +342,9 @@ impl CameraController for FreeCameraController {
         } else {
             self.yaw = 0.0;
         }
+    }
+
+    fn clear_mouse_pos(&mut self) {
+        self.last_mouse_position = None
     }
 }
