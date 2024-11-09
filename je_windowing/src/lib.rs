@@ -376,31 +376,27 @@ impl Events {
     }
 
     pub fn is_mouse_pressed(&self, input_button: MouseButton) -> bool {
-        self.events.iter().any(|e| {
-            if let WindowEvent::MouseInput {
-                button,
-                state: crate::InputState::Pressed,
-            } = e
-            {
-                *button == input_button
-            } else {
-                false
+        for event in self.events.iter().rev() {
+            if let WindowEvent::MouseInput { button, state } = event {
+                if *button == input_button {
+                    return *state == InputState::Pressed;
+                }
             }
-        })
+        }
+
+        false
     }
 
     pub fn is_mouse_released(&self, input_button: MouseButton) -> bool {
-        self.events.iter().any(|e| {
-            if let WindowEvent::MouseInput {
-                button,
-                state: crate::InputState::Released,
-            } = e
-            {
-                *button == input_button
-            } else {
-                false
+        for event in self.events.iter().rev() {
+            if let WindowEvent::MouseInput { button, state } = event {
+                if *button == input_button {
+                    return *state == InputState::Released;
+                }
             }
-        })
+        }
+
+        false
     }
 
     pub fn push(&mut self, event: WindowEvent) {

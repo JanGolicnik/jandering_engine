@@ -57,6 +57,35 @@ pub fn quad_data() -> (Vec<Vertex>, Vec<u32>) {
     (vertices, indices)
 }
 
+pub fn screenspace_quad_data() -> (Vec<Vertex>, Vec<u32>) {
+    let vertices = vec![
+        Vertex {
+            position: Vec3::new(-1.0, -1.0, 0.0),
+            uv: Vec2::new(0.0, 1.0),
+            normal: Vec3::new(0.0, 0.0, -1.0),
+        },
+        Vertex {
+            position: Vec3::new(-1.0, 1.0, 0.0),
+            uv: Vec2::new(0.0, 0.0),
+            normal: Vec3::new(0.0, 0.0, -1.0),
+        },
+        Vertex {
+            position: Vec3::new(1.0, -1.0, 0.0),
+            uv: Vec2::new(1.0, 1.0),
+            normal: Vec3::new(0.0, 0.0, -1.0),
+        },
+        Vertex {
+            position: Vec3::new(1.0, 1.0, 0.0),
+            uv: Vec2::new(1.0, 0.0),
+            normal: Vec3::new(0.0, 0.0, -1.0),
+        },
+    ];
+
+    let indices = vec![0, 3, 2, 0, 1, 3];
+
+    (vertices, indices)
+}
+
 pub fn plane_data(subdivisions: u32) -> (Vec<Vertex>, Vec<u32>) {
     let n_faces_side = 2u32.pow(subdivisions);
     let n_vertices_side = n_faces_side + 1;

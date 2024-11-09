@@ -1,4 +1,4 @@
-use primitives::plane_data;
+use primitives::{plane_data, screenspace_quad_data};
 
 use crate::{
     renderer::{BufferHandle, Janderer},
@@ -151,6 +151,12 @@ impl Instance {
         self.inv_model = self.model.inverse();
     }
 
+    pub fn set_rotation_qua(&mut self, qua: Qua) {
+        let (scale, _, translation) = self.model.to_scale_rotation_translation();
+        self.model = Mat4::from_scale_rotation_translation(scale, qua, translation);
+        self.inv_model = self.model.inverse();
+    }
+
     pub fn rotate(mut self, angle_rad: f32, axis: Vec3) -> Self {
         let (scale, rotation, translation) = self.model.to_scale_rotation_translation();
         let new_rot = Qua::from_axis_angle(axis, angle_rad);
@@ -159,12 +165,16 @@ impl Instance {
         self
     }
 
-    pub fn look_in_dir(&mut self, mut dir: Vec3) {
-        dir = dir.normalize();
-        let right = Vec3::Y.cross(dir).normalize();
-        let recalculated_up = dir.cross(right);
-        let rotation_matrix = Mat3::from_cols(right, recalculated_up, dir);
-        let rotation = Qua::from_mat3(&rotation_matrix);
+    pub fn look_in_dir(&mut self, mut dir: Vec3, up: Vec3) {
+        let rotation = if dir == up {
+            Qua::default()
+        } else {
+            dir = dir.normalize();
+            let right = up.cross(dir).normalize();
+            let recalculated_up = dir.cross(right);
+            let rotation_matrix = Mat3::from_cols(right, recalculated_up, dir);
+            Qua::from_mat3(&rotation_matrix)
+        };
         let (scale, _, translation) = self.model.to_scale_rotation_translation();
         self.model = Mat4::from_scale_rotation_translation(scale, rotation, translation);
         self.inv_model = self.model.inverse();
