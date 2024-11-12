@@ -65,6 +65,31 @@ impl WGPURenderer {
                             count: None,
                         }
                     }
+                    BindGroupLayoutDescriptorEntry::StorageTexture {
+                        access_type,
+                        format,
+                    } => wgpu::BindGroupLayoutEntry {
+                        binding: i as u32,
+                        visibility: wgpu::ShaderStages::COMPUTE
+                            | wgpu::ShaderStages::VERTEX
+                            | wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::StorageTexture {
+                            access: match access_type {
+                                crate::bind_group::StorageTextureAccessType::Read => {
+                                    wgpu::StorageTextureAccess::ReadOnly
+                                }
+                                crate::bind_group::StorageTextureAccessType::Write => {
+                                    wgpu::StorageTextureAccess::WriteOnly
+                                }
+                                crate::bind_group::StorageTextureAccessType::ReadWrite => {
+                                    wgpu::StorageTextureAccess::ReadWrite
+                                }
+                            },
+                            format: Self::texture_format_to_wgpu(format).0,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                        },
+                        count: None,
+                    },
                     BindGroupLayoutDescriptorEntry::Sampler { sampler_type, .. } => {
                         wgpu::BindGroupLayoutEntry {
                             binding: i as u32,

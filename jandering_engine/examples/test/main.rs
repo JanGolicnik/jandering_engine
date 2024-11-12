@@ -63,7 +63,7 @@ fn main() {
     let depth_texture = renderer.create_texture(TextureDescriptor {
         size: UVec2::splat(resolution),
         format: TextureFormat::Depth32F,
-        usage: texture_usage::ALL,
+        usage: texture_usage::GENERIC,
         ..Default::default()
     });
 
@@ -102,7 +102,7 @@ fn main() {
                 TextureDescriptor {
                     size: window.size().into(),
                     format: TextureFormat::Depth32F,
-                    usage: texture_usage::ALL,
+                    usage: texture_usage::GENERIC,
                     ..Default::default()
                 },
                 depth_texture,

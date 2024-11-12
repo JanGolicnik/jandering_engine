@@ -1,6 +1,9 @@
 use std::any::Any;
 
-use crate::renderer::{BufferHandle, BufferType};
+use crate::{
+    renderer::{BufferHandle, BufferType},
+    texture::TextureFormat,
+};
 
 use super::renderer::{SamplerHandle, TextureHandle};
 
@@ -35,10 +38,33 @@ pub enum TextureSampleType {
 }
 
 #[derive(Clone)]
+pub enum StorageTextureAccessType {
+    Read,
+    Write,
+    ReadWrite,
+}
+
+#[derive(Clone)]
+pub enum TextureDescriptorEntryType {
+    Regular {},
+    Storage {},
+}
+
+#[derive(Clone)]
 pub enum BindGroupLayoutDescriptorEntry {
-    Data { is_uniform: bool },
-    Texture { sample_type: TextureSampleType },
-    Sampler { sampler_type: SamplerType },
+    Data {
+        is_uniform: bool,
+    },
+    Texture {
+        sample_type: TextureSampleType,
+    },
+    StorageTexture {
+        access_type: StorageTextureAccessType,
+        format: TextureFormat,
+    },
+    Sampler {
+        sampler_type: SamplerType,
+    },
 }
 
 #[derive(Clone)]

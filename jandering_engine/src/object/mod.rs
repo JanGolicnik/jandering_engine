@@ -1,4 +1,4 @@
-use primitives::{plane_data, screenspace_quad_data};
+use primitives::plane_data;
 
 use crate::{
     renderer::{BufferHandle, Janderer},

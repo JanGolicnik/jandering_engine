@@ -7,10 +7,74 @@ use crate::bind_group::{
 
 pub struct TextureBindGroup {
     pub texture_handle: TextureHandle,
-    pub sampler_handle: SamplerHandle,
 }
 
 impl BindGroup for TextureBindGroup {
+    fn get_layout(&self) -> BindGroupLayout {
+        BindGroupLayout {
+            entries: vec![BindGroupLayoutEntry::Texture {
+                handle: self.texture_handle,
+                sample_type: TextureSampleType::default(),
+            }],
+        }
+    }
+
+    fn get_layout_descriptor() -> BindGroupLayoutDescriptor
+    where
+        Self: Sized,
+    {
+        BindGroupLayoutDescriptor {
+            entries: vec![BindGroupLayoutDescriptorEntry::Texture {
+                sample_type: Default::default(),
+            }],
+        }
+    }
+}
+
+impl TextureBindGroup {
+    pub fn new(_renderer: &mut Renderer, texture_handle: TextureHandle) -> Self {
+        Self { texture_handle }
+    }
+}
+
+pub struct UnfilteredTextureBindGroup {
+    pub texture_handle: TextureHandle,
+}
+
+impl BindGroup for UnfilteredTextureBindGroup {
+    fn get_layout(&self) -> BindGroupLayout {
+        BindGroupLayout {
+            entries: vec![BindGroupLayoutEntry::Texture {
+                handle: self.texture_handle,
+                sample_type: TextureSampleType::NonFilterable,
+            }],
+        }
+    }
+
+    fn get_layout_descriptor() -> BindGroupLayoutDescriptor
+    where
+        Self: Sized,
+    {
+        BindGroupLayoutDescriptor {
+            entries: vec![BindGroupLayoutDescriptorEntry::Texture {
+                sample_type: TextureSampleType::NonFilterable,
+            }],
+        }
+    }
+}
+
+impl UnfilteredTextureBindGroup {
+    pub fn new(_renderer: &mut Renderer, texture_handle: TextureHandle) -> Self {
+        Self { texture_handle }
+    }
+}
+
+pub struct TextureSamplerBindGroup {
+    pub texture_handle: TextureHandle,
+    pub sampler_handle: SamplerHandle,
+}
+
+impl BindGroup for TextureSamplerBindGroup {
     fn get_layout(&self) -> BindGroupLayout {
         BindGroupLayout {
             entries: vec![
@@ -43,7 +107,7 @@ impl BindGroup for TextureBindGroup {
     }
 }
 
-impl TextureBindGroup {
+impl TextureSamplerBindGroup {
     pub fn new(
         _renderer: &mut Renderer,
         texture_handle: TextureHandle,
@@ -56,12 +120,12 @@ impl TextureBindGroup {
     }
 }
 
-pub struct UnfilteredTextureBindGroup {
+pub struct UnfilteredTextureSamplerBindGroup {
     pub texture_handle: TextureHandle,
     pub sampler_handle: SamplerHandle,
 }
 
-impl BindGroup for UnfilteredTextureBindGroup {
+impl BindGroup for UnfilteredTextureSamplerBindGroup {
     fn get_layout(&self) -> BindGroupLayout {
         BindGroupLayout {
             entries: vec![
@@ -94,7 +158,7 @@ impl BindGroup for UnfilteredTextureBindGroup {
     }
 }
 
-impl UnfilteredTextureBindGroup {
+impl UnfilteredTextureSamplerBindGroup {
     pub fn new(
         _renderer: &mut Renderer,
         texture_handle: TextureHandle,

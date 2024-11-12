@@ -479,6 +479,7 @@ impl Janderer for WGPURenderer {
                     TextureFormat::F32 => wgpu::TextureFormat::R32Float,
                     TextureFormat::Depth32F => wgpu::TextureFormat::Depth32Float,
                     TextureFormat::Depth16U => wgpu::TextureFormat::Depth16Unorm,
+                    TextureFormat::Rgba32F => wgpu::TextureFormat::Rgba32Float,
                 };
 
                 let blend = if format == wgpu::TextureFormat::R32Float {
@@ -589,13 +590,7 @@ impl Janderer for WGPURenderer {
             depth_or_array_layers: 1,
         };
 
-        let (format, channels) = match desc.format {
-            TextureFormat::Rgba8U => (wgpu::TextureFormat::Rgba8UnormSrgb, 4),
-            TextureFormat::Bgra8U => (wgpu::TextureFormat::Bgra8UnormSrgb, 4),
-            TextureFormat::F32 => (wgpu::TextureFormat::R32Float, 4),
-            TextureFormat::Depth32F => (wgpu::TextureFormat::Depth32Float, 1),
-            TextureFormat::Depth16U => (wgpu::TextureFormat::Depth16Unorm, 1),
-        };
+        let (format, channels) = Self::texture_format_to_wgpu(desc.format);
 
         let mut usage = wgpu::TextureUsages::empty();
         if desc.usage & texture_usage::BIND != texture_usage::NONE {
@@ -609,6 +604,11 @@ impl Janderer for WGPURenderer {
         }
         if desc.usage & texture_usage::TARGET != texture_usage::NONE {
             usage |= wgpu::TextureUsages::RENDER_ATTACHMENT;
+        }
+        if desc.usage & (texture_usage::STORAGE_READ | texture_usage::STORAGE_WRITE)
+            != texture_usage::NONE
+        {
+            usage |= wgpu::TextureUsages::STORAGE_BINDING;
         }
 
         let texture = self.device.create_texture(&wgpu::TextureDescriptor {
@@ -633,7 +633,7 @@ impl Janderer for WGPURenderer {
                 data,
                 wgpu::ImageDataLayout {
                     offset: 0,
-                    bytes_per_row: Some(channels * size.width),
+                    bytes_per_row: Some(channels as u32 * size.width),
                     rows_per_image: None,
                 },
                 size,
@@ -876,6 +876,19 @@ impl Janderer for WGPURenderer {
     fn re_create_compute_shaders(&mut self) {
         for i in 0..self.compute_shaders.len() {
             self.re_create_compute_shader(ComputeShaderHandle(i));
+        }
+    }
+}
+
+impl WGPURenderer {
+    pub fn texture_format_to_wgpu(format: TextureFormat) -> (wgpu::TextureFormat, u8) {
+        match format {
+            TextureFormat::Rgba8U => (wgpu::TextureFormat::Rgba8UnormSrgb, 4),
+            TextureFormat::Bgra8U => (wgpu::TextureFormat::Bgra8UnormSrgb, 4),
+            TextureFormat::F32 => (wgpu::TextureFormat::R32Float, 4),
+            TextureFormat::Rgba32F => (wgpu::TextureFormat::Rgba32Float, 16),
+            TextureFormat::Depth32F => (wgpu::TextureFormat::Depth32Float, 1),
+            TextureFormat::Depth16U => (wgpu::TextureFormat::Depth16Unorm, 1),
         }
     }
 }

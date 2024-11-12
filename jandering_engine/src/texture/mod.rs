@@ -12,6 +12,7 @@ pub struct Texture {
 
 #[derive(Clone)]
 pub enum TextureFormat {
+    Rgba32F,
     Rgba8U,
     Bgra8U,
     F32,
@@ -22,13 +23,16 @@ pub enum TextureFormat {
 pub mod texture_usage {
     pub type TextureUsage = u32;
 
-    pub const ALL: TextureUsage = COPY_SRC | COPY_TARGET | BIND | TARGET;
+    pub const GENERIC_STORAGE: TextureUsage = BIND | STORAGE_WRITE;
+    pub const GENERIC: TextureUsage = COPY_SRC | COPY_TARGET | BIND | TARGET;
     pub const NONE: TextureUsage = 0;
 
     pub const COPY_SRC: TextureUsage = 1 << 0;
     pub const COPY_TARGET: TextureUsage = 1 << 1;
     pub const BIND: TextureUsage = 1 << 2;
     pub const TARGET: TextureUsage = 1 << 3;
+    pub const STORAGE_READ: TextureUsage = 1 << 4;
+    pub const STORAGE_WRITE: TextureUsage = 1 << 5;
 }
 
 #[derive(Clone)]
