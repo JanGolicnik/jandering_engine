@@ -1,3 +1,7 @@
 # Jandering engine
 
-This is a simple "engine" I'd like to use to make my Rust project in. I'm trying to give myself as much flexibility as possible while also having a reasonably clean API. I've not delved into rendering performance using indirect buffers and such much so I can't really call it a particulary fast rendering framework, but I do find it fun to use.
+This is a simple rendering engine I made as both a learning project and hopefully something I can use for all my further graphics programming endeavors. I want the engine to be super bare bones, as to not limit me when I want to do something obscure, but still simple enough where it doesnt take more than a few lines of code to get a pleasing result.
+
+## License
+
+Published under the MPL 2.0 license.
