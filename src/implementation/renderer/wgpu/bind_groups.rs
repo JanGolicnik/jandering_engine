@@ -148,6 +148,9 @@ impl WGPURenderer {
                     BindGroupLayoutEntry::Texture { handle, .. } => {
                         wgpu::BindingResource::TextureView(&self.textures[handle.0].view)
                     }
+                    BindGroupLayoutEntry::StorageTexture { handle, .. } => {
+                        wgpu::BindingResource::TextureView(&self.textures[handle.0].view)
+                    }
                     BindGroupLayoutEntry::Sampler { handle, .. } => {
                         wgpu::BindingResource::Sampler(&self.samplers[handle.0])
                     }

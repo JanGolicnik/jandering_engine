@@ -13,17 +13,11 @@ pub enum TextureSampleType {
     Depth,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum StorageTextureAccessType {
     Read,
     Write,
     ReadWrite,
-}
-
-#[derive(Clone)]
-pub enum TextureDescriptorEntryType {
-    Regular {},
-    Storage {},
 }
 
 #[derive(Clone)]
@@ -55,6 +49,12 @@ pub enum BindGroupLayoutEntry {
         handle: TextureHandle,
         sample_type: TextureSampleType,
     },
+
+    StorageTexture {
+        handle: TextureHandle,
+        access_type: StorageTextureAccessType,
+        format: TextureFormat,
+    },
     Sampler {
         handle: SamplerHandle,
         sampler_type: SamplerType,
@@ -70,6 +70,14 @@ impl From<BindGroupLayoutEntry> for BindGroupLayoutDescriptorEntry {
             BindGroupLayoutEntry::Texture { sample_type, .. } => {
                 BindGroupLayoutDescriptorEntry::Texture { sample_type }
             }
+            BindGroupLayoutEntry::StorageTexture {
+                access_type,
+                format,
+                ..
+            } => BindGroupLayoutDescriptorEntry::StorageTexture {
+                access_type,
+                format,
+            },
             BindGroupLayoutEntry::Sampler { sampler_type, .. } => {
                 BindGroupLayoutDescriptorEntry::Sampler { sampler_type }
             }

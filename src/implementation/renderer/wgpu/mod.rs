@@ -61,6 +61,8 @@ pub struct WGPURenderer {
     pub(crate) samplers: Vec<wgpu::Sampler>,
 
     pub(crate) buffers: Vec<wgpu::Buffer>,
+
+    current_encoder: Option<wgpu::CommandEncoder>,
 }
 
 impl Janderer for WGPURenderer {
@@ -82,8 +84,10 @@ impl Janderer for WGPURenderer {
 
         let device_descriptor = {
             let mut required_features = Features::empty();
-            if config.enable_compute {
-                required_features.insert(Features::VERTEX_WRITABLE_STORAGE)
+            if config.writable_storage {
+                required_features.insert(Features::VERTEX_WRITABLE_STORAGE);
+                required_features.insert(Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES);
+                required_features.insert(Features::CLEAR_TEXTURE);
             };
             &wgpu::DeviceDescriptor {
                 required_limits,
@@ -118,6 +122,8 @@ impl Janderer for WGPURenderer {
             bind_groups: Vec::new(),
 
             buffers: Vec::new(),
+
+            current_encoder: None,
         }
     }
 
@@ -260,11 +266,7 @@ impl Janderer for WGPURenderer {
     fn submit_pass(&mut self, pass: RenderPass) {
         let RenderPass { window, steps } = pass;
 
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Render Encoder"),
-            });
+        let mut encoder = self.get_encoder();
 
         let surface_texture_view = {
             let surface = self.surfaces.get_mut(&window.id()).unwrap();
@@ -421,10 +423,7 @@ impl Janderer for WGPURenderer {
             }
         }
 
-        if render_pass.is_some() {
-            drop(render_pass);
-            self.queue.submit(std::iter::once(encoder.finish()));
-        }
+        self.current_encoder = Some(encoder);
     }
 
     fn create_shader_at(&mut self, desc: ShaderDescriptor, handle: ShaderHandle) {
@@ -723,6 +722,10 @@ impl Janderer for WGPURenderer {
     }
 
     fn present(&mut self) {
+        if let Some(encoder) = self.current_encoder.take() {
+            self.queue.submit([encoder.finish()]);
+        }
+
         self.surfaces.iter_mut().for_each(|(_, surface)| {
             if let Some(e) = surface.surface_texture.take() {
                 e.present()
@@ -801,6 +804,22 @@ impl Janderer for WGPURenderer {
             self.re_create_compute_shader(ComputeShaderHandle(i));
         }
     }
+
+    fn clear_texture(&mut self, texture: TextureHandle) {
+        let mut encoder = self.get_encoder();
+        let texture = self.textures.get(texture.0).unwrap();
+        encoder.clear_texture(
+            &texture.texture,
+            &wgpu::ImageSubresourceRange {
+                aspect: wgpu::TextureAspect::All,
+                base_mip_level: 0,
+                mip_level_count: None,
+                base_array_layer: 0,
+                array_layer_count: None,
+            },
+        );
+        self.current_encoder = Some(encoder);
+    }
 }
 
 impl WGPURenderer {
@@ -813,5 +832,16 @@ impl WGPURenderer {
             TextureFormat::Depth32F => (wgpu::TextureFormat::Depth32Float, 1),
             TextureFormat::Depth16U => (wgpu::TextureFormat::Depth16Unorm, 1),
         }
+    }
+
+    pub fn get_encoder(&mut self) -> wgpu::CommandEncoder {
+        self.current_encoder
+            .take()
+            .unwrap_or(
+                self.device
+                    .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                        label: Some("Render Encoder"),
+                    }),
+            )
     }
 }

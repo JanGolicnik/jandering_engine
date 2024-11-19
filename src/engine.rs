@@ -20,7 +20,7 @@ impl Engine {
 
 #[derive(Default)]
 pub struct EngineConfig {
-    pub enable_compute: bool,
+    pub writable_storage: bool,
 }
 
 impl Engine {

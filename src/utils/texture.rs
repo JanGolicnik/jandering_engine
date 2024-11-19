@@ -73,10 +73,76 @@
 use crate::{
     bind_group::{
         BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutDescriptorEntry,
-        BindGroupLayoutEntry, SamplerType, TextureSampleType,
+        BindGroupLayoutEntry, SamplerType, StorageTextureAccessType, TextureSampleType,
     },
     renderer::{BindGroupHandle, Janderer, Renderer, SamplerHandle, TextureHandle},
+    texture::TextureFormat,
 };
+
+pub struct StorageTextureBindGroup {
+    pub texture_handle: TextureHandle,
+    pub bind_group: BindGroupHandle,
+
+    pub access_type: StorageTextureAccessType,
+    pub format: TextureFormat,
+}
+
+impl StorageTextureBindGroup {
+    pub fn new(
+        renderer: &mut Renderer,
+        texture_handle: TextureHandle,
+        access_type: StorageTextureAccessType,
+        format: TextureFormat,
+    ) -> Self {
+        let bind_group = renderer.create_bind_group(BindGroupLayout {
+            entries: vec![BindGroupLayoutEntry::StorageTexture {
+                handle: texture_handle,
+                access_type,
+                format,
+            }],
+        });
+
+        Self {
+            texture_handle,
+            bind_group,
+
+            access_type,
+            format,
+        }
+    }
+
+    pub fn get_layout_descriptor(&self) -> BindGroupLayoutDescriptor {
+        BindGroupLayoutDescriptor {
+            entries: vec![BindGroupLayoutDescriptorEntry::StorageTexture {
+                access_type: self.access_type,
+                format: self.format,
+            }],
+        }
+    }
+
+    pub fn re_create(
+        &mut self,
+        renderer: &mut Renderer,
+        texture_handle: TextureHandle,
+        access_type: StorageTextureAccessType,
+        format: TextureFormat,
+    ) {
+        self.texture_handle = texture_handle;
+        renderer.create_bind_group_at(
+            BindGroupLayout {
+                entries: vec![BindGroupLayoutEntry::StorageTexture {
+                    handle: texture_handle,
+                    access_type,
+                    format,
+                }],
+            },
+            self.bind_group,
+        );
+
+        self.access_type = access_type;
+        self.format = format;
+    }
+}
 
 pub struct TextureSamplerBindGroup {
     pub texture_handle: TextureHandle,

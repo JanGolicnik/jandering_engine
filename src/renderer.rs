@@ -137,6 +137,8 @@ pub trait Janderer {
 
     fn create_sampler(&mut self, desc: SamplerDescriptor) -> SamplerHandle;
 
+    fn clear_texture(&mut self, texture: TextureHandle);
+
     // bind group
     fn create_bind_group_at(&mut self, layout: BindGroupLayout, handle: BindGroupHandle);
 

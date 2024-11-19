@@ -1,4 +1,9 @@
-use crate::{bind_group::BindGroupLayoutDescriptor, texture::TextureFormat, utils::FilePath};
+use crate::{
+    bind_group::BindGroupLayoutDescriptor,
+    object::{Instance, Vertex},
+    texture::TextureFormat,
+    utils::FilePath,
+};
 
 #[derive(Clone)]
 pub enum ShaderSource {
@@ -73,7 +78,7 @@ impl Default for ShaderDescriptor {
         Self {
             name: "Unnamed Shader",
             source: ShaderSource::Code(include_str!("default_shader.wgsl").to_string()),
-            descriptors: Vec::new(),
+            descriptors: vec![Vertex::desc(), Instance::desc()],
             bind_group_layout_descriptors: Vec::new(),
             vs_entry: "vs_main",
             fs_entry: "fs_main",

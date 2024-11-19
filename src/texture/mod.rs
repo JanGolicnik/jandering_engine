@@ -10,7 +10,7 @@ pub struct Texture {
     pub height: u32,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum TextureFormat {
     Rgba32F,
     Rgba8U,
