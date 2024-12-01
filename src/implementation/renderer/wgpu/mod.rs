@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use compute_pass::WGPUComputePass;
-use wgpu::{util::DeviceExt, ComputePipelineDescriptor, Features, PresentMode, SurfaceTexture};
+use wgpu::{
+    util::DeviceExt, ComputePipelineDescriptor, Extent3d, Features, ImageCopyTextureBase, Origin3d,
+    PresentMode, SurfaceTexture,
+};
 
 use crate::{
     bind_group::BindGroupLayout,
@@ -469,6 +472,7 @@ impl Janderer for WGPURenderer {
                     TextureFormat::Depth32F => wgpu::TextureFormat::Depth32Float,
                     TextureFormat::Depth16U => wgpu::TextureFormat::Depth16Unorm,
                     TextureFormat::Rgba32F => wgpu::TextureFormat::Rgba32Float,
+                    TextureFormat::Rg32F => wgpu::TextureFormat::Rg32Float,
                 };
 
                 let blend = if format == wgpu::TextureFormat::R32Float {
@@ -820,6 +824,32 @@ impl Janderer for WGPURenderer {
         );
         self.current_encoder = Some(encoder);
     }
+
+    fn blit_textures(&mut self, from: TextureHandle, to: TextureHandle) {
+        if from == to {
+            panic!();
+        }
+
+        let mut encoder = self.get_encoder();
+        let from_texture = self.textures.get(from.0).unwrap();
+        let to_texture = self.textures.get(to.0).unwrap();
+        encoder.copy_texture_to_texture(
+            ImageCopyTextureBase {
+                texture: &from_texture.texture,
+                mip_level: 0,
+                origin: Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            ImageCopyTextureBase {
+                texture: &to_texture.texture,
+                mip_level: 0,
+                origin: Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            Extent3d::default(),
+        );
+        self.current_encoder = Some(encoder);
+    }
 }
 
 impl WGPURenderer {
@@ -829,6 +859,7 @@ impl WGPURenderer {
             TextureFormat::Bgra8U => (wgpu::TextureFormat::Bgra8UnormSrgb, 4),
             TextureFormat::F32 => (wgpu::TextureFormat::R32Float, 4),
             TextureFormat::Rgba32F => (wgpu::TextureFormat::Rgba32Float, 16),
+            TextureFormat::Rg32F => (wgpu::TextureFormat::Rg32Float, 8),
             TextureFormat::Depth32F => (wgpu::TextureFormat::Depth32Float, 1),
             TextureFormat::Depth16U => (wgpu::TextureFormat::Depth16Unorm, 1),
         }

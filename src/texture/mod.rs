@@ -13,6 +13,7 @@ pub struct Texture {
 #[derive(Clone, Copy)]
 pub enum TextureFormat {
     Rgba32F,
+    Rg32F,
     Rgba8U,
     Bgra8U,
     F32,

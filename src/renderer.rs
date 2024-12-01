@@ -139,6 +139,8 @@ pub trait Janderer {
 
     fn clear_texture(&mut self, texture: TextureHandle);
 
+    fn blit_textures(&mut self, from: TextureHandle, to: TextureHandle);
+
     // bind group
     fn create_bind_group_at(&mut self, layout: BindGroupLayout, handle: BindGroupHandle);
 
