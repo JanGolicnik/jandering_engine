@@ -293,10 +293,9 @@ impl Janderer for WGPURenderer {
         };
 
         let mut render_pass = None;
-        let previous_target = TargetTexture::Screen;
+        let mut previous_target = TargetTexture::Screen;
 
-        let len = steps.len() - 1;
-        for (i, step) in steps.iter().enumerate().take(len) {
+        for (i, step) in steps.iter().enumerate() {
             let RenderStep {
                 action,
                 shader,
@@ -310,6 +309,7 @@ impl Janderer for WGPURenderer {
             } = step;
 
             let mut changed = render_pass.is_none() || previous_target != *target;
+            previous_target = *target;
 
             if i > 0 {
                 if let Some(prev) = steps.get(i - 1) {
@@ -833,6 +833,10 @@ impl Janderer for WGPURenderer {
         let mut encoder = self.get_encoder();
         let from_texture = self.textures.get(from.0).unwrap();
         let to_texture = self.textures.get(to.0).unwrap();
+
+        let width = from_texture.width.min(to_texture.width);
+        let height = from_texture.height.min(to_texture.height);
+
         encoder.copy_texture_to_texture(
             ImageCopyTextureBase {
                 texture: &from_texture.texture,
@@ -846,7 +850,11 @@ impl Janderer for WGPURenderer {
                 origin: Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
-            Extent3d::default(),
+            Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
         );
         self.current_encoder = Some(encoder);
     }
