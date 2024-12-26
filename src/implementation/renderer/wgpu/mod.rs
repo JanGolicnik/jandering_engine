@@ -212,7 +212,7 @@ impl Janderer for WGPURenderer {
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: None,
                 contents,
-                usage: wgpu::BufferUsages::STORAGE,
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             });
 
         self.buffers.push(buffer);
@@ -447,7 +447,12 @@ impl Janderer for WGPURenderer {
             crate::shader::ShaderSource::Code(source) => source.clone(),
             #[cfg(not(target_arch = "wasm32"))]
             crate::shader::ShaderSource::File(file_path) => {
-                pollster::block_on(load_text(file_path.clone())).unwrap()
+                match pollster::block_on(load_text(file_path.clone())) {
+                    Ok(text) => text,
+                    Err(_) => {
+                        panic!("Could not find shader {:?}", file_path);
+                    }
+                }
             }
         };
 
@@ -489,13 +494,56 @@ impl Janderer for WGPURenderer {
             }
             None => None,
         };
-
         let attributes = desc
             .descriptors
             .iter()
-            .map(Self::get_buffer_attributes)
+            .map(|layout| {
+                layout
+                    .entries
+                    .iter()
+                    .map(|entry| wgpu::VertexAttribute {
+                        format: match entry.data_type {
+                            crate::shader::BufferLayoutEntryDataType::Float32 => {
+                                wgpu::VertexFormat::Float32
+                            }
+                            crate::shader::BufferLayoutEntryDataType::Float32x2 => {
+                                wgpu::VertexFormat::Float32x2
+                            }
+                            crate::shader::BufferLayoutEntryDataType::Float32x3 => {
+                                wgpu::VertexFormat::Float32x3
+                            }
+                            crate::shader::BufferLayoutEntryDataType::Float32x4 => {
+                                wgpu::VertexFormat::Float32x4
+                            }
+                            crate::shader::BufferLayoutEntryDataType::U32 => {
+                                wgpu::VertexFormat::Uint32
+                            }
+                            crate::shader::BufferLayoutEntryDataType::U32x4 => {
+                                wgpu::VertexFormat::Uint32x4
+                            }
+                            crate::shader::BufferLayoutEntryDataType::U8x4 => {
+                                wgpu::VertexFormat::Uint8x4
+                            }
+                        },
+                        offset: entry.offset,
+                        shader_location: entry.location,
+                    })
+                    .collect::<Vec<_>>()
+            })
             .collect::<Vec<_>>();
-        let buffers = Self::get_buffer_layouts(&attributes, &desc.descriptors);
+
+        let buffers = desc.descriptors
+            .iter()
+            .enumerate()
+            .map(|(i, e)| wgpu::VertexBufferLayout {
+                array_stride: e.stride as wgpu::BufferAddress,
+                step_mode: match e.step_mode {
+                    crate::shader::BufferLayoutStepMode::Vertex => wgpu::VertexStepMode::Vertex,
+                    crate::shader::BufferLayoutStepMode::Instance => wgpu::VertexStepMode::Instance,
+                },
+                attributes: &attributes[i],
+            })
+            .collect::<Vec<_>>();
 
         let pipeline = self
             .device

@@ -11,7 +11,7 @@ pub mod texture;
 
 pub const SQRT_3: f32 = 1.732_050_8;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum FilePath {
     FileName(&'static str),
     AbsolutePath(PathBuf),
@@ -71,7 +71,7 @@ pub async fn load_text(file: FilePath) -> anyhow::Result<String> {
                 FilePath::FileName(name) => Path::new("res").join(name),
                 FilePath::AbsolutePath(path) => path,
             };
-
+            println!("Loading file: {:?}", path);
            Ok(std::fs::read_to_string(path)?)
         }
     }

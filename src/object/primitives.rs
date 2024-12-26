@@ -86,7 +86,7 @@ pub fn screenspace_quad_data() -> (Vec<Vertex>, Vec<u32>) {
     (vertices, indices)
 }
 
-pub fn plane_data(subdivisions: u32) -> (Vec<Vertex>, Vec<u32>) {
+pub fn plane_data(subdivisions: u32, centered: bool) -> (Vec<Vertex>, Vec<u32>) {
     let n_faces_side = 2u32.pow(subdivisions);
     let n_vertices_side = n_faces_side + 1;
     let mut vertices = Vec::with_capacity((n_vertices_side * n_vertices_side) as usize);
@@ -97,8 +97,11 @@ pub fn plane_data(subdivisions: u32) -> (Vec<Vertex>, Vec<u32>) {
                 x as f32 / (n_vertices_side - 1) as f32,
                 y as f32 / (n_vertices_side - 1) as f32,
             );
+
+            let position = if centered { uv - 0.5 } else { uv }.extend(0.0);
+
             vertices.push(Vertex {
-                position: uv.extend(0.0),
+                position,
                 normal: Vec3::NEG_Z,
                 uv,
             });

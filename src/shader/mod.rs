@@ -26,28 +26,21 @@ pub enum BufferLayoutEntryDataType {
     Float32x4,
 
     U32,
+    U32x4,
+    U8x4
 }
 
 #[derive(Clone, Copy)]
 pub struct BufferLayoutEntry {
     pub location: u32,
+    pub offset: u64,
     pub data_type: BufferLayoutEntryDataType,
-}
-
-impl BufferLayoutEntryDataType {
-    pub fn size_bytes(&self) -> u64 {
-        match self {
-            BufferLayoutEntryDataType::Float32 | BufferLayoutEntryDataType::U32 => 4,
-            BufferLayoutEntryDataType::Float32x2 => 8,
-            BufferLayoutEntryDataType::Float32x3 => 12,
-            BufferLayoutEntryDataType::Float32x4 => 16,
-        }
-    }
 }
 
 #[derive(Clone)]
 pub struct BufferLayout {
     pub step_mode: BufferLayoutStepMode,
+    pub stride: usize,
     pub entries: &'static [BufferLayoutEntry],
 }
 

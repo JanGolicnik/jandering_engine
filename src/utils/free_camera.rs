@@ -319,15 +319,10 @@ impl CameraController for FreeCameraController {
         self.velocity += -self.velocity * (dt * 6.0);
     }
 
-    fn set_direction(&mut self, direction: Vec3) {
-        let length = direction.length();
-        self.pitch = (direction.y / length).asin().to_degrees();
-        let cos_pitch = self.pitch.cos();
-        if cos_pitch != 0.0 {
-            self.yaw = (direction.x / (cos_pitch * length)).asin().to_degrees();
-        } else {
-            self.yaw = 0.0;
-        }
+    fn set_direction(&mut self, mut direction: Vec3) {
+        direction = direction.normalize();
+        self.pitch = direction.y.asin().to_degrees();
+        self.yaw = direction.z.atan2(direction.x).to_degrees();
     }
 
     fn clear_mouse_pos(&mut self) {

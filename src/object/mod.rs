@@ -49,16 +49,20 @@ impl Vertex {
     pub fn desc() -> BufferLayout {
         BufferLayout {
             step_mode: crate::shader::BufferLayoutStepMode::Vertex,
+            stride: std::mem::size_of::<Vertex>(),
             entries: &[
                 BufferLayoutEntry {
+                    offset: std::mem::offset_of!(Vertex, position) as u64,
                     location: 0,
                     data_type: BufferLayoutEntryDataType::Float32x3,
                 },
                 BufferLayoutEntry {
+                    offset: std::mem::offset_of!(Vertex, normal) as u64,
                     location: 1,
                     data_type: BufferLayoutEntryDataType::Float32x3,
                 },
                 BufferLayoutEntry {
+                    offset: std::mem::offset_of!(Vertex, uv) as u64,
                     location: 2,
                     data_type: BufferLayoutEntryDataType::Float32x2,
                 },
@@ -87,36 +91,45 @@ impl Instance {
     pub fn desc() -> BufferLayout {
         BufferLayout {
             step_mode: crate::shader::BufferLayoutStepMode::Instance,
+            stride: std::mem::size_of::<Instance>(),
             entries: &[
                 BufferLayoutEntry {
+                    offset: std::mem::offset_of!(Instance, model) as u64,
                     location: 5,
                     data_type: BufferLayoutEntryDataType::Float32x4,
                 },
                 BufferLayoutEntry {
+                    offset: std::mem::offset_of!(Instance, model) as u64 + 16,
                     location: 6,
                     data_type: BufferLayoutEntryDataType::Float32x4,
                 },
                 BufferLayoutEntry {
+                    offset: std::mem::offset_of!(Instance, model) as u64 + 32,
                     location: 7,
                     data_type: BufferLayoutEntryDataType::Float32x4,
                 },
                 BufferLayoutEntry {
+                    offset: std::mem::offset_of!(Instance, model) as u64 + 48,
                     location: 8,
                     data_type: BufferLayoutEntryDataType::Float32x4,
                 },
                 BufferLayoutEntry {
+                    offset: std::mem::offset_of!(Instance, inv_model) as u64,
                     location: 9,
                     data_type: BufferLayoutEntryDataType::Float32x4,
                 },
                 BufferLayoutEntry {
+                    offset: std::mem::offset_of!(Instance, inv_model) as u64 + 16,
                     location: 10,
                     data_type: BufferLayoutEntryDataType::Float32x4,
                 },
                 BufferLayoutEntry {
+                    offset: std::mem::offset_of!(Instance, inv_model) as u64 + 32,
                     location: 11,
                     data_type: BufferLayoutEntryDataType::Float32x4,
                 },
                 BufferLayoutEntry {
+                    offset: std::mem::offset_of!(Instance, inv_model) as u64 + 48,
                     location: 12,
                     data_type: BufferLayoutEntryDataType::Float32x4,
                 },
@@ -131,7 +144,7 @@ impl Instance {
         }
     }
 
-    pub fn set_position(&mut self, pos: Vec3) {
+    pub fn translated(&mut self, pos: Vec3) {
         let (scale, rotation, _) = self.model.to_scale_rotation_translation();
         self.model = Mat4::from_scale_rotation_translation(scale, rotation, pos);
         self.inv_model = self.model.inverse();
@@ -144,23 +157,30 @@ impl Instance {
         self
     }
 
-    pub fn set_rotation(&mut self, angle_rad: f32, axis: Vec3) {
+    pub fn rotate(&mut self, angle_rad: f32, axis: Vec3) {
         let (scale, rotation, translation) = self.model.to_scale_rotation_translation();
         let new_rot = Qua::from_axis_angle(axis, angle_rad);
-        self.model = Mat4::from_scale_rotation_translation(scale, rotation * new_rot, translation);
+        self.model = Mat4::from_scale_rotation_translation(scale, new_rot * rotation, translation);
         self.inv_model = self.model.inverse();
     }
 
-    pub fn set_rotation_qua(&mut self, qua: Qua) {
+    pub fn rotate_qua(&mut self, qua: Qua) {
         let (scale, _, translation) = self.model.to_scale_rotation_translation();
         self.model = Mat4::from_scale_rotation_translation(scale, qua, translation);
         self.inv_model = self.model.inverse();
     }
 
-    pub fn rotate(mut self, angle_rad: f32, axis: Vec3) -> Self {
+    pub fn rotated(mut self, angle_rad: f32, axis: Vec3) -> Self {
         let (scale, rotation, translation) = self.model.to_scale_rotation_translation();
         let new_rot = Qua::from_axis_angle(axis, angle_rad);
-        self.model = Mat4::from_scale_rotation_translation(scale, rotation * new_rot, translation);
+        self.model = Mat4::from_scale_rotation_translation(scale, new_rot * rotation, translation);
+        self.inv_model = self.model.inverse();
+        self
+    }
+
+    pub fn rotated_qua(mut self, qua: Qua) -> Self {
+        let (scale, rotation, translation) = self.model.to_scale_rotation_translation();
+        self.model = Mat4::from_scale_rotation_translation(scale, rotation * qua, translation);
         self.inv_model = self.model.inverse();
         self
     }
@@ -180,20 +200,13 @@ impl Instance {
         self.inv_model = self.model.inverse();
     }
 
-    pub fn set_size(&mut self, size: Vec3) {
+    pub fn scale(&mut self, size: Vec3) {
         let (_, rotation, translation) = self.model.to_scale_rotation_translation();
         self.model = Mat4::from_scale_rotation_translation(size, rotation, translation);
         self.inv_model = self.model.inverse();
     }
 
-    pub fn scale(mut self, scalar: f32) -> Self {
-        let (scale, rotation, translation) = self.model.to_scale_rotation_translation();
-        self.model = Mat4::from_scale_rotation_translation(scale * scalar, rotation, translation);
-        self.inv_model = self.model.inverse();
-        self
-    }
-
-    pub fn resize(mut self, size: Vec3) -> Self {
+    pub fn scaled(mut self, size: Vec3) -> Self {
         let (scale, rotation, translation) = self.model.to_scale_rotation_translation();
         self.model = Mat4::from_scale_rotation_translation(scale * size, rotation, translation);
         self.inv_model = self.model.inverse();
@@ -288,11 +301,16 @@ impl<T: bytemuck::Pod> Object<T> {
         Self::new(renderer, vertices, indices, instances)
     }
 
-    pub fn plane(renderer: &mut Renderer, subdivisions: u32, instances: Vec<T>) -> Self
+    pub fn plane(
+        renderer: &mut Renderer,
+        subdivisions: u32,
+        centered: bool,
+        instances: Vec<T>,
+    ) -> Self
     where
         T: bytemuck::Pod,
     {
-        let (vertices, indices) = plane_data(subdivisions);
+        let (vertices, indices) = plane_data(subdivisions, centered);
         Self::new(renderer, vertices, indices, instances)
     }
 }
@@ -321,21 +339,26 @@ impl D2Instance {
     pub fn desc() -> BufferLayout {
         BufferLayout {
             step_mode: crate::shader::BufferLayoutStepMode::Instance,
+            stride: std::mem::size_of::<Self>(),
             entries: &[
                 BufferLayoutEntry {
                     location: 3,
+                    offset: std::mem::offset_of!(Self, position) as u64,
                     data_type: BufferLayoutEntryDataType::Float32x2,
                 },
                 BufferLayoutEntry {
                     location: 4,
+                    offset: std::mem::offset_of!(Self, scale) as u64,
                     data_type: BufferLayoutEntryDataType::Float32x2,
                 },
                 BufferLayoutEntry {
                     location: 5,
+                    offset: std::mem::offset_of!(Self, rotation) as u64,
                     data_type: BufferLayoutEntryDataType::Float32,
                 },
                 BufferLayoutEntry {
                     location: 6,
+                    offset: std::mem::offset_of!(Self, color) as u64,
                     data_type: BufferLayoutEntryDataType::Float32x3,
                 },
             ],
